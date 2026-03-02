@@ -8,8 +8,8 @@
 #include<stdbool.h>
 
 
-#ifndef DEFAULT_CAPACITY
-#define DEFAULT_CAPACITY 4
+#ifndef ARR_DEFAULT_CAPACITY
+#define ARR_DEFAULT_CAPACITY 4
 #endif
 
 
@@ -92,14 +92,14 @@ DA_FUNC bool _darr_get_helper(void* arr, size_t id) {
 
 DA_FUNC void* _darr_grow(size_t size, void* arr) {
   if (!arr) {
-    arr = _darr_new_helper(size, DEFAULT_CAPACITY);
+    arr = _darr_new_helper(size, ARR_DEFAULT_CAPACITY);
     if (!arr) return NULL;
   }
   darr_arr* data = _darr_get_data(arr);
   
   // GROW
   if (data->count >= data->capacity) {
-    size_t new_cap = (data->capacity) ? data->capacity*2 : DEFAULT_CAPACITY;
+    size_t new_cap = (data->capacity) ? data->capacity*2 : ARR_DEFAULT_CAPACITY;
     void* new_arr = _darr_grow_helper(arr, new_cap);
     if (new_arr) arr = new_arr;
   }

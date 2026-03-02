@@ -17,25 +17,15 @@ typedef struct {
 #define ll_new(type) ({\
   linked_list ll;\
   ll.head = NULL;\
-  ll.len = 0;\
   ll;\
 })
 
 #define ll_push(ll, arena, val) ({\
   node* new_node = arena_alloc(arena, sizeof(node));\
   new_node->value = arena_alloc(arena, sizeof(val));\
-  new_node->next = NULL;\
   *((typeof(val)*)new_node->value) = val;\
-  node* n = ll->head;\
-  if (!n) {\
-    ll->head = new_node;\
-  }\
-  else {\
-    while(n->next) {\
-      n = n->next;\
-    }\
-    n->next = new_node;\
-  }\
+  new_node->next = (ll)->head;\
+  (ll)->head = new_node;\
 })
 
 #define ll_get(ll_ptr, id) ({          \

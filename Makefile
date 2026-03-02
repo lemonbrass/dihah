@@ -22,7 +22,7 @@ run: $(BIN)
 	./$(BIN)
 
 $(BIN): lib
-	$(CC) $(SRCBIN) -Lbuild -ldihah -o $(BIN)
+	$(CC) $(SRCBIN) -Lbuild -ldihah -o $(BIN) $(CFLAGS)
 
 lib: $(LIBRARY)
 
@@ -47,3 +47,4 @@ clean:
 	rm -rf build
 
 -include $(OBJ:.o=.d)
+-include $(TESTOBJ:.o=.d)
