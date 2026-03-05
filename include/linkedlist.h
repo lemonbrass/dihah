@@ -20,13 +20,23 @@ typedef struct {
   ll;\
 })
 
-#define ll_push(ll, arena, val) ({\
-  node* new_node = arena_alloc(arena, sizeof(node));\
-  new_node->value = arena_alloc(arena, sizeof(val));\
-  *((typeof(val)*)new_node->value) = val;\
-  new_node->next = (ll)->head;\
-  (ll)->head = new_node;\
+// It doesn't allocate new memory for the data, just a new node for the list.
+#define ll_push_borrowed(ll, arena, val_ptr) ({ \
+  node* _new = arena_alloc(arena, sizeof(node)); \
+  _new->value = (val_ptr); \
+  _new->next = (ll)->head; \
+  (ll)->head = _new; \
 })
+
+// Use this for NEW insertions
+#define ll_push(ll, arena, val) ({ \
+  node* _new = arena_alloc(arena, sizeof(node)); \
+  _new->value = arena_alloc(arena, sizeof(val)); \
+  *((typeof(val)*)_new->value) = (val); \
+  _new->next = (ll)->head; \
+  (ll)->head = _new; \
+})
+
 
 #define ll_get(ll_ptr, id) ({          \
     node* n = (ll_ptr)->head;          \

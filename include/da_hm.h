@@ -136,7 +136,7 @@ hashmap _hashmap_resize(hashmap hm) {
     while (hv != NULL) {
       uint32_t hash = ((hm_val*)hv)->h;
       linked_list* ll_ = darr_get(hm_new.values, ID_FROM_HASH(hm_new, hash));
-      ll_push(ll_, &hm_new.ar, *hv);
+      ll_push_borrowed(ll_, &hm_new.ar, hv);
       id++;
       hv = ll_get(ll, id);
     }

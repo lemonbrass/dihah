@@ -25,7 +25,8 @@ typedef struct {
 arena arena_new(size_t size, bool zero);
 void* arena_alloc(arena* ar, size_t size);
 void arena_free(arena* ar);
-void arena_reset(arena* ar);;
+void arena_reset(arena* ar);
+void* arena_mark(arena* ar);
 
 
 #ifdef DA_ARENA_IMPLEMENTATION
@@ -39,6 +40,10 @@ arena arena_new(size_t size, bool zero) {
   ar.zero = zero;
   memset(ar.mem, 0, ar.size);
   return ar;
+}
+
+void* arena_mark(arena* ar) {
+  return ar->mem + ar->pos;
 }
 
 void* arena_alloc(arena* ar, size_t size) {
