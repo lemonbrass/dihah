@@ -11,7 +11,7 @@ char curr_char(lexer* l) {
 }
 
 int advance(lexer* l) {
-  if (l->id >= l->length) return -1;
+  if (l->id + 1 >= l->length) return -1;
   l->id++;
   char next = curr_char(l);
   if (next == '\n') {
@@ -28,7 +28,7 @@ lexer new_lexer(const char* source) {
   lexer l;
   l.source = source;
   l.id = 0;
-  l.length = strlen(source);
+  l.length = strlen(source) + 1;
   l.pos.ch = 1;
   l.pos.line = 1;
   l.ar = arena_new(1024, false);
@@ -38,33 +38,82 @@ lexer new_lexer(const char* source) {
 
 token lex_id(lexer* l) {
   char ch = curr_char(l);
-  char* id = arena_mark(&l->ar);
+  char* id = NULL;
   while (isalnum(ch) || ch == '_') {
-    *(char*)arena_alloc(&l->ar, sizeof(char)) = ch;
+    darr_push(id, ch);
     ch = VALIDATE_CHAR(advance(l));
   }
-  *(char*)arena_alloc(&l->ar, sizeof(char)) = '\0';
+  darr_push(id, '\0');
+  char* id_cpy = arena_alloc(&l->ar, strlen(id)+1);
+  strcpy(id_cpy, id);
+  darr_free(id);
+  
+  #define X(keyword, keyword_type) \
+  if (strcmp(id_cpy, #keyword) == 0) {\
+    token t;\
+    t.type = keyword_type; \
+    t.content.str = id_cpy; \
+    return t;\
+  }
+
+  KEYWORDS(X)
+
+  #undef X
+  
   token t;
-  t.content.str = id;
+  t.content.str = id_cpy;
   t.type = TT_ID;
+  return t;
+}
+
+token lex_str(lexer* l) {
+  char* str = NULL;
+  char ch = VALIDATE_CHAR(advance(l));
+  while (true) {
+    if (ch == '\\') {
+      switch (peek(l)) {
+        
+        #define X(code, val)\
+           case code: darr_push(str, val); VALIDATE_CHAR(advance(l)); break;
+          ESCAPES(X)
+        #undef X
+
+        default:
+          printf("INVALID STRING ESCAPE\n");
+          dump_lexer_state(l);
+          darr_free(str);
+          free_lexer(l);
+          exit(1);
+      }
+      ch = VALIDATE_CHAR(advance(l));
+      continue;
+    }
+    if (ch == '\"') {
+      VALIDATE_CHAR(advance(l));
+      break;
+    }
+    darr_push(str, ch);
+    ch = VALIDATE_CHAR(advance(l));
+  }
+  darr_push(str, '\0');
+  char* str_cpy = arena_alloc(&l->ar, strlen(str)+1);
+  strcpy(str_cpy, str);
+  darr_free(str);
+  token t;
+  t.content.str = str_cpy;
+  t.type = TT_STRING;
   return t;
 }
 
 token lex_num(lexer* l) {
   char ch = curr_char(l);
   signed long num = 0;
-  int sign = 1;
-  if (ch == '-') {
-    sign = -1;
-    ch = VALIDATE_CHAR(advance(l));
-  }
   while (isdigit(ch)) {
     num = num * 10 + (ch - '0');
     ch = VALIDATE_CHAR(advance(l));
-    printf("%ld", num);
   }
   token t;
-  t.content.num = num * sign;
+  t.content.num = num;
   t.type = TT_NUM;
   return t;
 }
@@ -75,58 +124,65 @@ token next_tok(lexer* l) {
     ch = VALIDATE_CHAR(advance(l));
   }
 
+  if (ch == '\0') {
+    token t;
+    t.type = TT_EOF;
+    return t;
+  }
+
+  // DONOT VALIDATE_CHAR(PEEK) HERE, ITS USELSS + IT WILL ERROR OUT IF ITS EOF
+  if (ch == '/' && peek(l) == '/') {
+    VALIDATE_CHAR(advance(l)); //skip first /
+    VALIDATE_CHAR(advance(l)); //skip second /
+    while (ch != '\0' && ch != '\n') {
+      ch = VALIDATE_CHAR(advance(l));
+    }
+    return next_tok(l);
+  }
+
+  if (ch == '/' && peek(l) == '*') {
+    VALIDATE_CHAR(advance(l)); //skip /
+    VALIDATE_CHAR(advance(l)); //skip *
+    while (ch != '\0' && (ch != '*' && VALIDATE_CHAR(peek(l)) != '/')) {
+      ch = VALIDATE_CHAR(advance(l));
+    }
+    if (ch == '\0') {
+      printf("Unterminated /**/ comment :D\n");
+      dump_lexer_state(l);
+      exit(1);
+    }
+    VALIDATE_CHAR(advance(l)); //skip *
+    VALIDATE_CHAR(advance(l)); //skip /
+    return next_tok(l);
+  }
+
+  if (ch == '\"') {
+    return lex_str(l);
+  }
+
+
   if (isalpha(ch) || ch == '_') {
     return lex_id(l);
   }
 
-  if (isdigit(ch) || (ch == '-' && isdigit(VALIDATE_CHAR(peek(l))) )) {
+  if (isdigit(ch)) {
     return lex_num(l);
-  }
-
-  if (ch == '\0') {
-    token t;
-    t.type = TT_EOF;
-    VALIDATE_CHAR(advance(l));
-    return t;
   }
 
   VALIDATE_CHAR(advance(l));
   switch (ch) {
-    case '(': {
-        token t;
-        t.type = TT_OPAREN;
-        return t;
-      }
-    case ')': {
-        token t;
-        t.type = TT_CPAREN;
-        return t;
-      }
-    case '{': {
-        token t;
-        t.type = TT_OCURLY;
-        return t;
-      }
-    case '}': {
-        token t;
-        t.type = TT_CCURLY;
-        return t;
-      }
-    case '[': {
-        token t;
-        t.type = TT_OSQUARE;
-        return t;
-      }
-    case ']': {
-        token t;
-        t.type = TT_CSQUARE;
-        return t;
-      }
+    #define X(tok_type, c) case c: {token t; t.type = tok_type; return t;}
+      BRACKETS(X)
+    #undef X
     case '&':
     case ':':
+    case ',':
+    case ';':
     case '*':
+    case '.':
     case '+':
     case '-':
+    case '=':
     case '/':
     case '#':
     case '!':
@@ -141,7 +197,7 @@ token next_tok(lexer* l) {
         return t;
       }
     default: {
-      printf("Invalid character: %c\n", curr_char(l));
+      printf("Invalid character: %c\n", ch);
       dump_lexer_state(l);
       exit(1);
     }
@@ -159,14 +215,35 @@ int peek(lexer* l) {
 
 void dump_lexer_state(lexer* l) {
   printf("lexer l @ %p, id = %zu, length = %zu\n", l, l->id, l->length);
-  size_t id = l->id;
+  printf("Cursor @ line %zu column %zu: ", l->pos.line, l->pos.ch);
+  size_t id = l->id - (l->pos.ch - 1);
   char ch = l->source[id];
+  if (ch == '\n')  {
+    id += 1;
+    ch = l->source[id];
+  }
   while (ch != '\n' && ch != '\0' && id < l->length) {
     printf("%c", ch);
     id++;
     ch = l->source[id];
   }
-  printf("\nCursor @ line %zu column %zu\n", l->pos.line, l->pos.ch);
+  printf("\n");
+}
+
+void print_token(token* t) {
+  switch (t->type) {
+    #define X(token_type, c) case token_type: printf("%s(%c)", #token_type, c); break;
+      BRACKETS(X)
+    #undef X
+    case TT_ID: printf("TT_ID(%s)", t->content.str); break;
+    case TT_NUM: printf("TT_NUM(%ld)", t->content.num); break;
+    case TT_EOF: printf("TT_EOF"); break;
+    case TT_OP: printf("TT_OP(%c)", t->content.op); break;
+    case TT_STRING: printf("TT_STRING(%s)", t->content.str); break;
+    #define X(keyword, keyword_type) case keyword_type: printf("%s(%s)", #keyword_type, #keyword); break;
+    KEYWORDS(X)
+    #undef X
+  }
 }
 
 char* read_file(const char *path) {
