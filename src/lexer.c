@@ -48,10 +48,10 @@ token lex_id(lexer* l) {
   strcpy(id_cpy, id);
   darr_free(id);
   
-  #define X(keyword, keyword_type) \
-  if (strcmp(id_cpy, #keyword) == 0) {\
+  #define X(tt, k) \
+  if (strcmp(id_cpy, #k) == 0) {\
     token t;\
-    t.type = keyword_type; \
+    t.type = tt; \
     t.content.str = id_cpy; \
     return t;\
   }
@@ -169,39 +169,40 @@ token next_tok(lexer* l) {
     return lex_num(l);
   }
 
+
+  #define X(tt, v) if (lstrmatch(l, v)) {\
+    token t; \
+    t.type = tt; \
+    t.content.str = v; \
+    VALIDATE_CHAR(advance(l));\
+    return t;\
+  }
+  OPERATORS(X)
+  #undef X
+  
   VALIDATE_CHAR(advance(l));
   switch (ch) {
     #define X(tok_type, c) case c: {token t; t.type = tok_type; return t;}
-      BRACKETS(X)
+      SEPERATORS(X)
     #undef X
-    case '&':
-    case ':':
-    case ',':
-    case ';':
-    case '*':
-    case '.':
-    case '+':
-    case '-':
-    case '=':
-    case '/':
-    case '#':
-    case '!':
-    case '?':
-    case '<':
-    case '>':
-    case '%':
-      {
-        token t;
-        t.content.op = ch;
-        t.type = TT_OP;
-        return t;
-      }
+    case '#': {
+      token t;
+      t.type = TT_PREPROCESS;
+      return t;
+    }
     default: {
       printf("Invalid character: %c\n", ch);
       dump_lexer_state(l);
       exit(1);
     }
   }
+}
+
+bool lstrmatch(lexer* l, const char* str) {
+  size_t len = strlen(str);
+  bool res = strncmp(l->source + l->id, str, len) == 0;
+  if (res) l->id+=len-1;
+  return res;
 }
 
 void free_lexer(lexer* l) {
@@ -232,16 +233,30 @@ void dump_lexer_state(lexer* l) {
 
 void print_token(token* t) {
   switch (t->type) {
-    #define X(token_type, c) case token_type: printf("%s(%c)", #token_type, c); break;
-      BRACKETS(X)
-    #undef X
+    case TT_PREPROCESS: printf("TT_PREPROCESS(#)"); break;
     case TT_ID: printf("TT_ID(%s)", t->content.str); break;
     case TT_NUM: printf("TT_NUM(%ld)", t->content.num); break;
     case TT_EOF: printf("TT_EOF"); break;
-    case TT_OP: printf("TT_OP(%c)", t->content.op); break;
-    case TT_STRING: printf("TT_STRING(%s)", t->content.str); break;
-    #define X(keyword, keyword_type) case keyword_type: printf("%s(%s)", #keyword_type, #keyword); break;
-    KEYWORDS(X)
+    case TT_STRING: {
+      printf("TT_STRING(");
+      for (size_t i = 0; i < strlen(t->content.str); i++) {
+        char ch = t->content.str[i];
+        switch (ch) {
+          #define X(c, escapecode) case escapecode: printf("\\%c", c); break;
+            ESCAPES(X)
+            default: printf("%c", ch);
+          #undef X
+        }
+      }
+      printf(")");
+      break;
+    }
+    #define X(tt, v) case tt: printf("%s(%c)", #tt, v); break;
+      SEPERATORS(X)
+    #undef X
+    #define X(tt, v) case tt: printf("%s(%s)", #tt, v); break;
+      KEYWORDS(X)
+      OPERATORS(X)
     #undef X
   }
 }

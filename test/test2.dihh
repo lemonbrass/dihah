@@ -4,7 +4,7 @@ int x = y + 1;
 
 /* This function is sexy aint it */
 void a(int a, int b) {
-  // equate and print "equal babeeee"
-  if (a == b) printf("equal babeeee\n \r \t");
+  // equate and print "equal haahahahahah \n \r \t"
+  if (a == b) printf("equal haahahahahah\n \r \t");
 }
 

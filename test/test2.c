@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 int main() {
-  lexer l = new_lexer(read_file("test2.cc"));
+  lexer l = new_lexer(read_file("test/test2.dihh"));
   token t = next_tok(&l);
   while (t.type != TT_EOF && l.id < l.length) {
     print_token(&t);

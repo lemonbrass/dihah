@@ -6,6 +6,7 @@
 #include <da_arr.h>
 #include <stdio.h>
 
+// TODO: MULTICHAR ESCAPES
 #define ESCAPES(X) \
   X('n','\n') \
   X('t','\t') \
@@ -19,47 +20,90 @@
   X('?','?') \
   X('0','\0')
 
-#define BRACKETS(X)\
+#define OPERATORS(X) \
+  X(TT_LSHIFT_EQ, "<<=") \
+  X(TT_RSHIFT_EQ, ">>=") \
+  X(TT_ELLIPSIS, "...") \
+  X(TT_INC, "++") \
+  X(TT_DEC, "--") \
+  X(TT_ARROW, "->") \
+  X(TT_LSHIFT, "<<") \
+  X(TT_RSHIFT, ">>") \
+  X(TT_LE, "<=") \
+  X(TT_GE, ">=") \
+  X(TT_EQ, "==") \
+  X(TT_NEQ, "!=") \
+  X(TT_ANDAND, "&&") \
+  X(TT_OROR, "||") \
+  X(TT_ADD_EQ, "+=") \
+  X(TT_SUB_EQ, "-=") \
+  X(TT_MUL_EQ, "*=") \
+  X(TT_DIV_EQ, "/=") \
+  X(TT_MOD_EQ, "%=") \
+  X(TT_AND_EQ, "&=") \
+  X(TT_OR_EQ, "|=") \
+  X(TT_XOR_EQ, "^=") \
+  X(TT_PLUS, "+") \
+  X(TT_MINUS, "-") \
+  X(TT_STAR, "*") \
+  X(TT_SLASH, "/") \
+  X(TT_PERCENT, "%") \
+  X(TT_LT, "<") \
+  X(TT_GT, ">") \
+  X(TT_ASSIGN, "=") \
+  X(TT_NOT, "!") \
+  X(TT_AND, "&") \
+  X(TT_OR, "|") \
+  X(TT_XOR, "^") \
+  X(TT_TILDE, "~") \
+  X(TT_QUESTION, "?") \
+  X(TT_COLON, ":") \
+  X(TT_DOT, ".")
+
+#define SEPERATORS(X)\
   X(TT_OPAREN, '(')\
   X(TT_CPAREN, ')')\
   X(TT_OCURLY, '{')\
   X(TT_CCURLY, '}')\
   X(TT_OSQUARE, '[')\
-  X(TT_CSQUARE, ']')
+  X(TT_CSQUARE, ']')\
+  X(TT_COL, ':')\
+  X(TT_COMMA, ',')\
+  X(TT_SEMICOL, ';')
 
 #define KEYWORDS(X)\
-  X(void, TT_VOID)\
-  X(char, TT_CHAR)\
-  X(short, TT_SHORT)\
-  X(int, TT_INT)\
-  X(long, TT_LONG)\
-  X(float, TT_FLOAT)\
-  X(double, TT_DOUBLE)\
-  X(bool, TT_BOOL)\
-  X(signed, TT_SIGNED)\
-  X(unsigned, TT_UNSIGNED)\
-  X(struct, TT_STRUCT)\
-  X(union, TT_UNION)\
-  X(enum, TT_ENUM)\
-  X(typedef, TT_TYPEDEF)\
-  X(if, TT_IF)\
-  X(else, TT_ELSE)\
-  X(switch, TT_SWITCH)\
-  X(case, TT_CASE)\
-  X(default, TT_DEFAULT)\
-  X(for, TT_FOR)\
-  X(while, TT_WHILE)\
-  X(do, TT_DO)\
-  X(break, TT_BREAK)\
-  X(continue, TT_CONTINUE)\
-  X(return, TT_RETURN)\
-  X(goto, TT_GOTO)\
-  X(static, TT_STATIC)\
-  X(extern, TT_EXTERN)\
-  X(const, TT_CONST)\
-  X(volatile, TT_VOLATILE)\
-  X(sizeof, TT_SIZEOF)\
-  X(inline, TT_INLINE)
+  X(TT_VOID, "void")\
+  X(TT_CHAR, "char")\
+  X(TT_SHORT, "short")\
+  X(TT_INT, "int")\
+  X(TT_LONG, "long")\
+  X(TT_FLOAT, "float")\
+  X(TT_DOUBLE, "double")\
+  X(TT_BOOL, "bool")\
+  X(TT_SIGNED, "signed")\
+  X(TT_UNSIGNED, "unsigned")\
+  X(TT_STRUCT, "struct")\
+  X(TT_UNION, "union")\
+  X(TT_ENUM, "enum")\
+  X(TT_TYPEDEF, "typedef")\
+  X(TT_IF, "if")\
+  X(TT_ELSE, "else")\
+  X(TT_SWITCH, "switch")\
+  X(TT_CASE, "case")\
+  X(TT_DEFAULT, "default")\
+  X(TT_FOR, "for")\
+  X(TT_WHILE, "while")\
+  X(TT_DO, "do")\
+  X(TT_BREAK, "break")\
+  X(TT_CONTINUE, "continue")\
+  X(TT_RETURN, "return")\
+  X(TT_GOTO, "goto")\
+  X(TT_STATIC, "static")\
+  X(TT_EXTERN, "extern")\
+  X(TT_CONST, "const")\
+  X(TT_VOLATILE, "volatile")\
+  X(TT_SIZEOF, "sizeof")\
+  X(TT_INLINE, "inline")
 
 // validate a character 
 #define VALIDATE_CHAR(ch) ({\
@@ -77,18 +121,14 @@ typedef enum {
 } CHAR_CLASS;
 
 typedef enum {
-  TT_OPAREN,     // ( 
-  TT_CPAREN,     // ) 
-  TT_OCURLY,     // {  
-  TT_CCURLY,     // } 
-  TT_OSQUARE,    // [  
-  TT_CSQUARE,    // }  
   TT_ID,         //     
   TT_NUM,        //     
-  TT_OP,         // + - / * &.....
-  #define X(k, keyword_type) keyword_type,
+  #define X(tt, v) tt,
   KEYWORDS(X)
+  SEPERATORS(X)
+  OPERATORS(X)
   #undef X
+  TT_PREPROCESS,
   TT_STRING,
   TT_EOF
 } tok_type;
@@ -115,6 +155,7 @@ typedef struct {
 
 
 
+bool lstrmatch(lexer* l, const char* str);
 void print_token(token* t);
 void dump_lexer_state(lexer* l);
 char curr_char(lexer* l);
