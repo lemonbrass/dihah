@@ -147,7 +147,7 @@ typedef struct {
 
 typedef struct {
   const char* source;
-  arena ar;
+  arena* ar;
   size_t length;
   size_t id;
   struct {
@@ -164,7 +164,7 @@ void dump_lexer_state(lexer* l);
 char curr_char(lexer* l);
 int advance(lexer* l);
   
-lexer new_lexer(const char* source);
+lexer new_lexer(const char* source, arena* ar);
 token next_tok(lexer* l);
 void free_lexer(lexer* l);
 int peek(lexer* l);

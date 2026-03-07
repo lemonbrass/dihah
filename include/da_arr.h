@@ -8,13 +8,13 @@
 #include<stdbool.h>
 
 
+#define CAPACITY_BASED_BOUNDS (1u << 0)
+
 #ifndef ARR_DEFAULT_CAPACITY
 #define ARR_DEFAULT_CAPACITY 4
 #endif
 
-
-#define DA_FUNC 
-#define darr_new(arr, cap) arr = _darr_new_helper(sizeof(*arr), cap)
+#define darr_new(arr, cap, flags) arr = _darr_new_helper(sizeof(*arr), cap, flags)
 // AVOID Double Evaluation
 #define darr_len(arr) _darr_len_helper(arr)
 #define darr_cap(arr) _darr_cap_helper(arr)
@@ -48,51 +48,55 @@ typedef struct {
   size_t count;
   size_t capacity;
   size_t valsize;
+  uint8_t flags;
   alignas(max_align_t) char padding[];
 } darr_arr;
 
 
 
-DA_FUNC void* _darr_grow_helper(void* arr, size_t new_cap);
-DA_FUNC darr_arr* _darr_get_data(void* arr);
-DA_FUNC void* _darr_new_helper(size_t size, size_t cap);
-DA_FUNC bool _darr_get_helper(void* arr, size_t id);
-DA_FUNC void* _darr_grow(size_t size, void* arr);
-DA_FUNC void* _darr_pop_helper(size_t size, void* arr);
-DA_FUNC size_t _darr_cap_helper(void* arr);
-DA_FUNC size_t _darr_len_helper(void* arr);
+void* _darr_grow_helper(void* arr, size_t new_cap);
+darr_arr* _darr_get_data(void* arr);
+void* _darr_new_helper(size_t size, size_t cap, uint8_t flags);
+bool _darr_get_helper(void* arr, size_t id);
+void* _darr_grow(size_t size, void* arr);
+void* _darr_pop_helper(size_t size, void* arr);
+size_t _darr_cap_helper(void* arr);
+size_t _darr_len_helper(void* arr);
 
 
 
 #ifdef DA_ARR_IMPLEMENTATION
 
-DA_FUNC void* _darr_new_helper(size_t size, size_t cap) {
-  size_t total = size*cap + sizeof(darr_arr);
-  if (total > SIZE_MAX / size) return NULL;
+void* _darr_new_helper(size_t size, size_t cap, uint8_t flags) {
+  if (cap > SIZE_MAX / size) return NULL;
+  size_t total = size * cap + sizeof(darr_arr);
   darr_arr* data = malloc(total);
   if (!data) return NULL;
   void* arr = data + 1;
   data->capacity = cap;
   data->count = 0;
   data->valsize = size;
+  data->flags = flags;
   return arr;
 }
 
-DA_FUNC darr_arr* _darr_get_data(void* arr) {
+darr_arr* _darr_get_data(void* arr) {
   if (!arr) return NULL;
   return (darr_arr*)arr - 1;
 }
 
-DA_FUNC bool _darr_get_helper(void* arr, size_t id) {
-  darr_arr* data =_darr_get_data(arr);
+bool _darr_get_helper(void* arr, size_t id) {
+  darr_arr* data = _darr_get_data(arr);
   if (!data) return false;
-  if (data->capacity <= id) return false;
-  return true;
+  size_t bound = (data->flags & CAPACITY_BASED_BOUNDS)
+                 ? data->capacity
+                 : data->count;
+  return id < bound;
 }
 
-DA_FUNC void* _darr_grow(size_t size, void* arr) {
+void* _darr_grow(size_t size, void* arr) {
   if (!arr) {
-    arr = _darr_new_helper(size, ARR_DEFAULT_CAPACITY);
+    arr = _darr_new_helper(size, ARR_DEFAULT_CAPACITY, 0);
     if (!arr) return NULL;
   }
   darr_arr* data = _darr_get_data(arr);
@@ -107,7 +111,7 @@ DA_FUNC void* _darr_grow(size_t size, void* arr) {
   return arr;
 }
 
-DA_FUNC void* _darr_grow_helper(void* arr, size_t new_cap) {
+void* _darr_grow_helper(void* arr, size_t new_cap) {
   darr_arr* data = _darr_get_data(arr);
   if (data->capacity < new_cap) {
     size_t size = data->valsize;
@@ -121,7 +125,7 @@ DA_FUNC void* _darr_grow_helper(void* arr, size_t new_cap) {
   return arr;
 }
 
-DA_FUNC void* _darr_pop_helper(size_t size, void* arr) {
+void* _darr_pop_helper(size_t size, void* arr) {
   darr_arr* data = _darr_get_data(arr);
   if (!data) return NULL;
   if (data->count == 0) return NULL;
@@ -129,13 +133,13 @@ DA_FUNC void* _darr_pop_helper(size_t size, void* arr) {
   return (char*)arr + size*data->count;
 }
 
-DA_FUNC size_t _darr_cap_helper(void* arr) {
+size_t _darr_cap_helper(void* arr) {
   darr_arr* data = _darr_get_data(arr);
   if (!data) return 0;
   return data->capacity;
 }
 
-DA_FUNC size_t _darr_len_helper(void* arr) {
+size_t _darr_len_helper(void* arr) {
   darr_arr* data = _darr_get_data(arr);
   if (!data) return 0;
   return data->count;

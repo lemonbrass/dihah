@@ -24,14 +24,14 @@ int advance(lexer* l) {
   return next;
 }
   
-lexer new_lexer(const char* source) {
+lexer new_lexer(const char* source, arena* ar) {
   lexer l;
   l.source = source;
   l.id = 0;
   l.length = strlen(source) + 1;
   l.pos.ch = 1;
   l.pos.line = 1;
-  l.ar = arena_new(1024*1024, false);
+  l.ar = ar;
 
   return l;
 }
@@ -44,7 +44,7 @@ token lex_id(lexer* l) {
     ch = VALIDATE_CHAR(advance(l));
   }
   darr_push(id, '\0');
-  char* id_cpy = arena_alloc(&l->ar, strlen(id)+1);
+  char* id_cpy = arena_alloc(l->ar, strlen(id)+1);
   strcpy(id_cpy, id);
   darr_free(id);
   
@@ -96,7 +96,7 @@ token lex_str(lexer* l) {
     ch = VALIDATE_CHAR(advance(l));
   }
   darr_push(str, '\0');
-  char* str_cpy = arena_alloc(&l->ar, strlen(str)+1);
+  char* str_cpy = arena_alloc(l->ar, strlen(str)+1);
   strcpy(str_cpy, str);
   darr_free(str);
   token t;
@@ -206,7 +206,7 @@ bool lstrmatch(lexer* l, const char* str) {
 }
 
 void free_lexer(lexer* l) {
-  arena_free(&l->ar);
+  free((void*)l->source);
 }
 
 int peek(lexer* l) {

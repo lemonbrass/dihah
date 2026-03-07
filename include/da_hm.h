@@ -84,7 +84,7 @@ hashmap _dahm_new_helper(size_t keysize, size_t valsize, uint32_t (*hash)(void*)
 
 hashmap _dahm_new_helper(size_t keysize, size_t valsize, uint32_t (*hash)(void*)){
   hashmap hm;
-  darr_new(hm.values, HM_DEFAULT_CAPACITY);
+  darr_new(hm.values, HM_DEFAULT_CAPACITY, CAPACITY_BASED_BOUNDS);
   hm.keysize = keysize;
   hm.valsize = valsize;
   hm.hash = hash;
@@ -100,7 +100,7 @@ hashmap _dahm_new_helper(size_t keysize, size_t valsize, uint32_t (*hash)(void*)
 
 hashmap _dahm_new_with_cap(size_t keysize, size_t valsize, uint32_t (*hash)(void*), size_t cap, arena ar){
   hashmap hm;
-  darr_new(hm.values, cap);
+  darr_new(hm.values, cap, CAPACITY_BASED_BOUNDS);
   hm.keysize = keysize;
   hm.valsize = valsize;
   hm.hash = hash;

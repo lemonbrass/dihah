@@ -68,7 +68,7 @@ chunk chunk_new(size_t size, uint8_t flags) {
 
 arena arena_new(size_t size, uint8_t flags) {
   arena ar = {0};
-  ar.chunks = NULL;
+  darr_new(ar.chunks, ARR_DEFAULT_CAPACITY, 0);
   ar.flags = flags;
   ar.size = size;
   ar.minempty = 0;

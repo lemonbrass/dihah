@@ -23,13 +23,19 @@ typedef struct {
   token* args;
   token* val;
 } define_data;
+
 typedef struct {
-  
-} ifelif_data;
-typedef struct {} else_data;
-typedef struct {} include_data;
-typedef struct {} undef_data;
-typedef struct {} ifdefifndef_data;
+  // TODO: needs an expression evaluator/parser.....
+} ifelifelse_data;
+
+typedef struct {
+  char* file;
+  bool angled;
+} include_data;
+
+typedef struct {
+  uid_t macro;
+} undef_data;
 typedef struct {} message_data;
 
 
