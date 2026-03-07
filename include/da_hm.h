@@ -17,18 +17,6 @@
 
 #define ID_FROM_HASH(hm, hash) (hash)%(hm.cap)
 #define dahm_new(k_type, v_type, hash) _dahm_new_helper(sizeof(k_type), sizeof(v_type), hash)
-// #define dahm_set(hm, k, val) ({\
-//   typeof(k) key_temp = k;\
-//   uint32_t h = hm.hash(&key_temp);\
-//   linked_list* ll = darr_get(hm.values, ID_FROM_HASH(hm, h));\
-//   hm_val hv = {0};\
-//   hv.value = arena_alloc(&hm.ar, hm.valsize);\
-//   hv.key = arena_alloc(&hm.ar, hm.keysize);\
-//   *(typeof(k)*)hv.key = key_temp;\
-//   *((typeof(val)*)hv.value) = val;\
-//   hv.h = h;\
-//   ll_push(ll, &hm.ar, hv);\
-// })
 
 #define dahm_set(hm, k, val) ({\
   if ((double)(hm).len >= (double)(hm).cap * HM_LOAD_FACTOR){\
@@ -102,7 +90,7 @@ hashmap _dahm_new_helper(size_t keysize, size_t valsize, uint32_t (*hash)(void*)
   hm.hash = hash;
   hm.cap = HM_DEFAULT_CAPACITY;
   hm.len = 0;
-  hm.ar = arena_new(valsize*4, true);
+  hm.ar = arena_new(HM_DEFAULT_CAPACITY * (valsize + keysize), true);
   for (size_t i = 0; i<darr_len(hm.values); i++) {
     linked_list* ll = darr_get(hm.values, i);
     *ll = ll_new(hm_val);

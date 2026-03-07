@@ -1,6 +1,6 @@
 .PHONY: bin lib clean test
 
-CC = clang
+CC = gcc
 CFLAGS = -MMD -MP -Wall -Wextra -Wconversion -g -Iinclude -O0
 
 LIBRARY = build/libdihah.a
@@ -16,7 +16,7 @@ TESTOBJ := $(patsubst test/%.c,build/test/%.o,$(TEST))
 TESTBIN := $(TESTOBJ:.o=.exe)
 
 runtest: test
-	$(foreach test, $(TESTBIN), ./$(test))
+	$(foreach test, $(TESTBIN), ./$(test);)
 
 run: $(BIN)
 	./$(BIN)

@@ -31,7 +31,7 @@ lexer new_lexer(const char* source) {
   l.length = strlen(source) + 1;
   l.pos.ch = 1;
   l.pos.line = 1;
-  l.ar = arena_new(1024, false);
+  l.ar = arena_new(1024*1024, false);
 
   return l;
 }
@@ -191,7 +191,7 @@ token next_tok(lexer* l) {
       return t;
     }
     default: {
-      printf("Invalid character: %c\n", ch);
+      // printf("Invalid character: %c\n", ch);
       dump_lexer_state(l);
       exit(1);
     }

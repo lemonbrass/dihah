@@ -6,6 +6,8 @@
 #include <da_arr.h>
 #include <stdio.h>
 
+
+
 // TODO: MULTICHAR ESCAPES
 #define ESCAPES(X) \
   X('n','\n') \
@@ -84,6 +86,7 @@
   X(TT_UNSIGNED, "unsigned")\
   X(TT_STRUCT, "struct")\
   X(TT_UNION, "union")\
+  X(TT_MACRO, "macro")\
   X(TT_ENUM, "enum")\
   X(TT_TYPEDEF, "typedef")\
   X(TT_IF, "if")\
