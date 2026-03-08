@@ -114,6 +114,14 @@
   (char)((tmp != -1) ? tmp : (printf("VALIDATE_CHAR error: ch = -1 & line = %d\n", __LINE__), exit(1), '\0'));\
 })
 
+#define ERROR_TOKEN(msg) ({\
+  token t;\
+  t.type = TT_ERROR;\
+  t.content.str = msg;\
+  t;\
+})
+
+// TODO: symantic analysis: ID CANT COME AFTER NUM... etc
 typedef enum {
   CC_NUM,
   CC_ALPHA,
@@ -131,9 +139,10 @@ typedef enum {
   SEPERATORS(X)
   OPERATORS(X)
   #undef X
-  TT_PREPROCESS,
   TT_STRING,
-  TT_EOF
+  TT_EOF,
+  TT_ERROR,
+  TT_PREPROCESS,
 } tok_type;
 
 typedef struct {
@@ -166,9 +175,15 @@ int advance(lexer* l);
   
 lexer new_lexer(const char* source, arena* ar);
 token next_tok(lexer* l);
-void free_lexer(lexer* l);
 int peek(lexer* l);
 char* read_file(const char* path);
 
+// compare next token with a str which is transformed to a token....
+bool eat_str(lexer* l, const char* str);
+bool try_eat_str(lexer* l, const char* str);
+bool try_eat_tok(lexer* l, const token t);
+bool eat_tok(lexer* l, const token t);
+token match_consume(lexer* l, const tok_type t);
+char* tok_to_str(token t);
 
 #endif

@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <da_arena.h>
 #include <ctype.h>
 #include <lexer.h>
@@ -44,12 +45,12 @@ token lex_id(lexer* l) {
     ch = VALIDATE_CHAR(advance(l));
   }
   darr_push(id, '\0');
-  char* id_cpy = arena_alloc(l->ar, strlen(id)+1);
-  strcpy(id_cpy, id);
+  char* id_cpy = arena_alloc(l->ar, darr_len(id));
+  memcpy(id_cpy, id, darr_len(id));
   darr_free(id);
   
   #define X(tt, k) \
-  if (strcmp(id_cpy, #k) == 0) {\
+  if (strcmp(id_cpy, k) == 0) {\
     token t;\
     t.type = tt; \
     t.content.str = id_cpy; \
@@ -59,7 +60,7 @@ token lex_id(lexer* l) {
   KEYWORDS(X)
 
   #undef X
-  
+
   token t;
   t.content.str = id_cpy;
   t.type = TT_ID;
@@ -82,7 +83,6 @@ token lex_str(lexer* l) {
           printf("INVALID STRING ESCAPE\n");
           dump_lexer_state(l);
           darr_free(str);
-          free_lexer(l);
           exit(1);
       }
       ch = VALIDATE_CHAR(advance(l));
@@ -143,7 +143,7 @@ token next_tok(lexer* l) {
   if (ch == '/' && peek(l) == '*') {
     VALIDATE_CHAR(advance(l)); //skip /
     VALIDATE_CHAR(advance(l)); //skip *
-    while (ch != '\0' && (ch != '*' && VALIDATE_CHAR(peek(l)) != '/')) {
+    while (ch != '\0' && (ch != '*' || VALIDATE_CHAR(peek(l)) != '/')) {
       ch = VALIDATE_CHAR(advance(l));
     }
     if (ch == '\0') {
@@ -185,13 +185,9 @@ token next_tok(lexer* l) {
     #define X(tok_type, c) case c: {token t; t.type = tok_type; return t;}
       SEPERATORS(X)
     #undef X
-    case '#': {
-      token t;
-      t.type = TT_PREPROCESS;
-      return t;
-    }
+    case '#': return (token) { .type = TT_PREPROCESS };
     default: {
-      // printf("Invalid character: %c\n", ch);
+      printf("Invalid character: %c\n", ch);
       dump_lexer_state(l);
       exit(1);
     }
@@ -203,10 +199,6 @@ bool lstrmatch(lexer* l, const char* str) {
   bool res = strncmp(l->source + l->id, str, len) == 0;
   if (res) l->id+=len-1;
   return res;
-}
-
-void free_lexer(lexer* l) {
-  free((void*)l->source);
 }
 
 int peek(lexer* l) {
@@ -231,6 +223,45 @@ void dump_lexer_state(lexer* l) {
   printf("\n");
 }
 
+/*
+char* tok_to_str(token t) {
+  char* dest = NULL;
+  switch (t.type) {
+    #define X(tt, v) case tt:                 \
+      dest = malloc(strlen(v) + 1);        \
+      strcpy(dest, v);                     \
+      break;
+    OPERATORS(X)
+    KEYWORDS(X)
+    #undef X
+    #define X(tt, v) case tt:                 \
+      dest = malloc(2);                     \
+      dest[0] = v;                          \
+      dest[1] = '\0';                       \
+      break;
+    SEPERATORS(X)
+    #undef X
+    case TT_STRING:
+    case TT_ID:
+      dest = malloc(strlen(t.content.str) + 1);
+      strcpy(dest, t.content.str);
+      break;
+    case TT_NUM:
+      dest = malloc(32); // enough for 64-bit integer
+      snprintf(dest, 32, "%ld", t.content.num);
+      break;
+    case TT_EOF:
+      return NULL;
+    case TT_ERROR:
+      printf("ERROR: %s\n", t.content.str);
+      assert(false);
+      break;
+  }
+
+  return dest;
+}
+*/
+
 void print_token(token* t) {
   switch (t->type) {
     case TT_PREPROCESS: printf("TT_PREPROCESS(#)"); break;
@@ -251,6 +282,7 @@ void print_token(token* t) {
       printf(")");
       break;
     }
+    case TT_ERROR: printf("ERROR: %s\n", t->content.str); assert(false);
     #define X(tt, v) case tt: printf("%s(%c)", #tt, v); break;
       SEPERATORS(X)
     #undef X
@@ -263,6 +295,10 @@ void print_token(token* t) {
 
 char* read_file(const char *path) {
   FILE *f = fopen(path, "rb");
+  if (!f) {
+    perror(path);
+    exit(1);
+  }
 
   fseek(f, 0, SEEK_END);
   size_t size = (size_t)ftell(f);
@@ -271,7 +307,91 @@ char* read_file(const char *path) {
   char *buf = malloc(size + 1);
   fread(buf, 1, size, f);
   buf[size] = '\0';
-
+  
   fclose(f);
   return buf;
+}
+
+bool tok_cmp(token t1, token t2) {
+  if (t1.type != t2.type) return false;
+  switch (t1.type) {
+    #define X(tt, val) case tt: 
+    OPERATORS(X)
+    SEPERATORS(X)
+    KEYWORDS(X)
+    #undef X
+    case TT_EOF: {
+      return true;
+    }
+
+    case TT_ID:
+    case TT_STRING: {
+      return strcmp(t1.content.str, t2.content.str) == 0;
+    }
+    case TT_NUM: {
+      return t1.content.num == t2.content.num;
+    }
+    default: assert(false);
+  }
+} 
+
+bool eat_str(lexer* l, const char* str) {
+  arena ar = arena_new(1024, 0);
+  lexer l_new = new_lexer(str, &ar);
+  token t = next_tok(l);
+  token t_0 = next_tok(&l_new);
+  bool result = true;
+  while (l_new.length > l_new.id && t_0.type != TT_EOF) {
+    if (!tok_cmp(t, t_0)) {
+      result = false;
+      goto cleanup;
+    }
+    t = next_tok(l);
+    t_0 = next_tok(&l_new);
+  }
+
+  cleanup:
+    arena_free(&ar);
+    return result;
+}
+
+bool try_eat_str(lexer* l, const char* str) {
+  arena ar = arena_new(1024, 0);
+  lexer l_new = new_lexer(str, &ar);
+  lexer l_mark = *l;
+  token t = next_tok(l);
+  token t_0 = next_tok(&l_new);
+  bool result = true;
+  while (l_new.length > l_new.id && t_0.type != TT_EOF) {
+    if (!tok_cmp(t, t_0)) {
+      result = false;
+      goto cleanup;
+    }
+    t = next_tok(l);
+    t_0 = next_tok(&l_new);
+  }
+
+  cleanup:
+    arena_free(&ar);
+    if (!result) *l = l_mark;
+    return result;
+  
+}
+
+bool eat_tok(lexer* l, const token t) {
+  token t1 = next_tok(l);
+  return tok_cmp(t1, t);
+}
+bool try_eat_tok(lexer* l, const token t) {
+  lexer l_mark = *l;
+  token t1 = next_tok(l);
+  bool res = tok_cmp(t, t1);
+  if (!res) *l = l_mark;
+  return res;
+}
+
+token match_consume(lexer* l, const tok_type tt) {
+  token t = next_tok(l);
+  assert(t.type == tt);
+  return t;
 }

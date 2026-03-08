@@ -1,4 +1,4 @@
-#include <stdio.h>
+// #include <stdio.h>
 int y = -5 - -2;
 int x = y + 1;
 
