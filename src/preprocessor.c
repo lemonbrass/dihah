@@ -2,6 +2,7 @@
 #include "lexer.h"
 #include <preprocessor.h>
 #include <string.h>
+#include <source_file.h>
 
 #define PP_FUNC static inline
 
@@ -13,13 +14,14 @@ PP pp_new(arena* ar, lexer* l) {
   return pp;
 }
 
-PP_FUNC char* get_include_filename(lexer* l) {
+PP_FUNC include_task get_include_data(lexer* l) {
+  include_task inc = {0};
   char ch;
   ch = VALIDATE_CHAR(advance(l));
   char* buf = NULL;
-  darr_push(buf, ch);
   
   if (ch == '<') {
+    inc.angled = true;
     ch = VALIDATE_CHAR(advance(l));
     while (ch != '>' && ch != '\0') {
       darr_push(buf, ch);
@@ -28,6 +30,7 @@ PP_FUNC char* get_include_filename(lexer* l) {
     VALIDATE_CHAR(advance(l));  
   }
   else if (ch == '"') {
+    inc.angled = false;
     ch = VALIDATE_CHAR(advance(l));
     while (ch != '"' && ch != '\0') {
       darr_push(buf, ch);
@@ -35,17 +38,20 @@ PP_FUNC char* get_include_filename(lexer* l) {
     }
     VALIDATE_CHAR(advance(l));
   }
-
-  /*
-    HERE BUF WILL BE either: <file.... OR "file.. (without closing >)
-  */
+  else {
+    assert(false && "Invalid token after #include");
+  }
 
   darr_push(buf, '\0');
   char* str = arena_alloc(l->ar, strlen(buf) + 1);
   strcpy(str, buf);
   darr_free(buf);
 
-  return str;
+  inc.filename = str;
+  return inc;
+}
+
+char* include_read_file(PP* pp) {
 }
 
 // these wont be needed.. because parse_if(PP*) handles these
@@ -57,10 +63,9 @@ PP_FUNC token parse_endif(PP* pp) { (void)pp; return ERROR_TOKEN("UNREACHABLE");
 PP_FUNC token parse_ifdef(PP* pp) { (void)pp; return ERROR_TOKEN("UNREACHABLE"); }
 
 PP_FUNC token parse_include(PP* pp) {
-  include_task inc = {0};
-  char* str = get_include_filename(pp->l);
-  inc.angled = str[0] == '<';
-  inc.filename = str+1;
+  include_task inc = get_include_data(pp->l);
+  char* source = include_read_file(pp);
+  inc.l = new_lexer(source, pp->ar);
   // return token logic
   return (token) { .type = TT_ERROR, .content.str = "UNIMPLEMENTED" };
 }
@@ -89,6 +94,5 @@ token pp_next_tok(PP* pp) {
 }
 
 void pp_free(PP *pp) {
-  // TODO:
-  (void)pp;
+  darr_free(pp->task_stack);
 }

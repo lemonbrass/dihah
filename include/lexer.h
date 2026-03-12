@@ -169,6 +169,7 @@ typedef struct {
 
 bool lstrmatch(lexer* l, const char* str);
 void print_token(token* t);
+void print_token_str(token* t);
 void dump_lexer_state(lexer* l);
 char curr_char(lexer* l);
 int advance(lexer* l);
@@ -176,8 +177,7 @@ int advance(lexer* l);
 lexer new_lexer(const char* source, arena* ar);
 token next_tok(lexer* l);
 int peek(lexer* l);
-char* read_file(const char* path);
-
+char* read_file(arena* ar, const char *path);
 // compare next token with a str which is transformed to a token....
 bool eat_str(lexer* l, const char* str);
 bool try_eat_str(lexer* l, const char* str);

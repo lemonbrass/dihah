@@ -5,6 +5,8 @@
 #include <preprocessor.h>
 
 typedef struct {
+  char** search_paths;
+  char** sys_search_paths;
   preprocessor pp;
   lexer l;
   char* filename;

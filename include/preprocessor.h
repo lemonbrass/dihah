@@ -5,6 +5,7 @@
 #include <da_arena.h>
 #include <lexer.h>
 
+struct source_file;
 extern hashmap defines; // GLOBAL for all parsers.....
 
 
@@ -70,7 +71,7 @@ typedef struct {
 typedef struct {
   char* filename;
   bool angled;
-  lexer* l;
+  lexer l;
 } include_task;
 
 typedef struct {
@@ -86,6 +87,7 @@ typedef struct {
   lexer* l;
   task_t* task_stack;
   arena* ar;
+  struct source_file* sf;
 } preprocessor;
 
 typedef preprocessor PP;

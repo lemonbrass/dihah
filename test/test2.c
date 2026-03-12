@@ -10,10 +10,11 @@ int main() {
   new_sf(&sf, "test/src1.dihh");
 
   for (token t = pp_next_tok(&sf.pp); t.type != TT_EOF; t = pp_next_tok(&sf.pp)) {
-    print_token(&t);
+    print_token_str(&t);
     printf(" ");
     if (t.type == TT_ERROR) break;
   }
+  printf("\n");
   
   free_sf(&sf);
   return 0;

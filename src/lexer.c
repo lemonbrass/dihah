@@ -223,44 +223,38 @@ void dump_lexer_state(lexer* l) {
   printf("\n");
 }
 
-/*
-char* tok_to_str(token t) {
-  char* dest = NULL;
-  switch (t.type) {
-    #define X(tt, v) case tt:                 \
-      dest = malloc(strlen(v) + 1);        \
-      strcpy(dest, v);                     \
+void print_token_str(token* t) {
+  switch (t->type) {
+    #define X(tt, v) case tt:\
+      printf("%s", v);\
       break;
     OPERATORS(X)
     KEYWORDS(X)
     #undef X
-    #define X(tt, v) case tt:                 \
-      dest = malloc(2);                     \
-      dest[0] = v;                          \
-      dest[1] = '\0';                       \
+    #define X(tt, v) case tt:\
+      printf("%c", v);\
       break;
     SEPERATORS(X)
     #undef X
     case TT_STRING:
+      printf("\"%s\"", t->content.str);
+      break;
     case TT_ID:
-      dest = malloc(strlen(t.content.str) + 1);
-      strcpy(dest, t.content.str);
+      printf("%s", t->content.str);
       break;
     case TT_NUM:
-      dest = malloc(32); // enough for 64-bit integer
-      snprintf(dest, 32, "%ld", t.content.num);
+      printf("%ld", t->content.num);
       break;
-    case TT_EOF:
-      return NULL;
+    case TT_EOF: break;
     case TT_ERROR:
-      printf("ERROR: %s\n", t.content.str);
+      printf("ERROR: %s\n", t->content.str);
       assert(false);
       break;
+    case TT_PREPROCESS:
+      printf("#");
+      break;
   }
-
-  return dest;
 }
-*/
 
 void print_token(token* t) {
   switch (t->type) {
@@ -293,7 +287,7 @@ void print_token(token* t) {
   }
 }
 
-char* read_file(const char *path) {
+char* read_file(arena* ar, const char *path) {
   FILE *f = fopen(path, "rb");
   if (!f) {
     perror(path);
@@ -304,7 +298,7 @@ char* read_file(const char *path) {
   size_t size = (size_t)ftell(f);
   rewind(f);
 
-  char *buf = malloc(size + 1);
+  char *buf = arena_alloc(ar, size + 1);
   fread(buf, 1, size, f);
   buf[size] = '\0';
   

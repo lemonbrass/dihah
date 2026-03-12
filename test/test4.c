@@ -8,16 +8,16 @@
 int main() {
   arena ar = arena_new(1024*64, 0);
 
-  char* src = read_file("test/src1.dihh");
+  char* src = read_file(&ar, "test/src1.dihh");
   lexer l = new_lexer(src, &ar);
 
   for (token t = next_tok(&l); t.type != TT_EOF; t = next_tok(&l)) {
-    print_token(&t);
+    print_token_str(&t);
     printf(" ");
     if (t.type == TT_ERROR) break;
   }
+  printf("\n");
 
   arena_free(&ar);
-  free(src);
   return 0;
 }
