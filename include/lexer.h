@@ -145,8 +145,16 @@ typedef enum {
   TT_PREPROCESS,
 } tok_type;
 
+struct source_file;
+
+typedef struct {
+  size_t line;
+  size_t ch;
+} pos_t;
+
 typedef struct {
   tok_type type;
+  pos_t pos;
   union {
     char* str;
     signed long num;
@@ -155,14 +163,10 @@ typedef struct {
 } token;
 
 typedef struct {
-  const char* source;
-  arena* ar;
+  struct source_file* sf;
   size_t length;
   size_t id;
-  struct {
-    size_t line;
-    size_t ch;
-  } pos;
+  pos_t pos;
 } lexer;
 
 
@@ -173,11 +177,13 @@ void print_token_str(token* t);
 void dump_lexer_state(lexer* l);
 char curr_char(lexer* l);
 int advance(lexer* l);
+
+lexer new_scratch_lexer();
+void free_scratch_lexer(lexer* l);
   
-lexer new_lexer(const char* source, arena* ar);
+lexer new_lexer(struct source_file* sf);
 token next_tok(lexer* l);
 int peek(lexer* l);
-char* read_file(arena* ar, const char *path);
 // compare next token with a str which is transformed to a token....
 bool eat_str(lexer* l, const char* str);
 bool try_eat_str(lexer* l, const char* str);

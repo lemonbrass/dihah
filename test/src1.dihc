@@ -1,0 +1,10 @@
+#include "src1.dihh"
+int y = -5 - -2;
+int x = y + 1;
+
+/* This function is sexy aint it */
+void a(int a, int b) {
+  // equate and print "equal haahahahahah \n \r \t"
+  if (a == b) printf("equal haahahahahaha\n \r \t");
+}
+

@@ -71,7 +71,7 @@ typedef struct {
 typedef struct {
   char* filename;
   bool angled;
-  lexer l;
+  struct source_file* sf;
 } include_task;
 
 typedef struct {
@@ -84,16 +84,14 @@ typedef struct {
 
 
 typedef struct {
-  lexer* l;
   task_t* task_stack;
-  arena* ar;
   struct source_file* sf;
 } preprocessor;
 
 typedef preprocessor PP;
 
 // cant find opportunity to add sizeof(pp).... ;D
-PP pp_new(arena* ar, lexer* l);
+PP pp_new(struct source_file* sf);
 token pp_next_tok(PP* pp);
 void pp_free(PP* pp);
 
