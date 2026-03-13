@@ -24,4 +24,7 @@ source_file* new_sf(arena* ar, char* filename) {
 void free_sf(source_file* sf) {
   pp_free(&sf->pp);
   darr_free(sf->symbols);
+  darr_free(sf->search_paths);
+  darr_free(sf->sys_search_paths);
+  pp_free(&sf->pp);
 }

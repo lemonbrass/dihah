@@ -104,13 +104,23 @@ PP_FUNC token parse_include(PP* pp) {
   return pp_next_tok(&t.val.inc.sf->pp);
 }
 
+void pop_task(PP* pp) {
+  task_t* t = darr_pop(pp->task_stack);
+
+  switch (t->type) {
+    case PP_INCLUDE: free_sf(t->val.inc.sf);
+    default: return;
+  }
+}
+
 token pp_next_tok(PP* pp) {
   size_t len = darr_len(pp->task_stack);
   if (len > 0) {
     task_t t = pp->task_stack[len-1];
     token tok = pp_next_tok(&t.val.inc.sf->pp);
-    if (tok.type == TT_EOF)
-      darr_pop(pp->task_stack);
+    if (tok.type == TT_EOF) {
+      pop_task(pp);
+    }
     else
       return tok;
   }
