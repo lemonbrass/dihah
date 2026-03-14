@@ -39,7 +39,7 @@ typedef struct {
 } arena;
 
 void arena_mark_reset(arena_mark_t* m, arena* ar);
-arena arena_new(size_t size, uint8_t flags);
+arena* arena_new(size_t size, uint8_t flags);
 chunk chunk_new(size_t size, uint8_t flags);
 void* arena_alloc(arena* ar, size_t size);
 void arena_free(arena* ar);
@@ -66,14 +66,17 @@ chunk chunk_new(size_t size, uint8_t flags) {
   return ch;
 }
 
-arena arena_new(size_t size, uint8_t flags) {
+arena* arena_new(size_t size, uint8_t flags) {
   arena ar = {0};
   darr_new(ar.chunks, ARR_DEFAULT_CAPACITY, 0);
   ar.flags = flags;
   ar.size = size;
   ar.minempty = 0;
   darr_push(ar.chunks, chunk_new(size, flags));
-  return ar;
+  
+  arena* ar_ptr = malloc(sizeof(arena));
+  *ar_ptr = ar;
+  return ar_ptr;
 }
 
 arena_mark_t arena_mark(arena* ar) {
@@ -135,6 +138,7 @@ void arena_free(arena* ar) {
     chunk_free(darr_get(ar->chunks, i));
   }
   darr_free(ar->chunks);
+  free(ar);
 }
 
 void arena_reset(arena* ar) {

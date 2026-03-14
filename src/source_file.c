@@ -26,5 +26,4 @@ void free_sf(source_file* sf) {
   darr_free(sf->symbols);
   darr_free(sf->search_paths);
   darr_free(sf->sys_search_paths);
-  pp_free(&sf->pp);
 }

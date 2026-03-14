@@ -85,6 +85,7 @@ typedef struct {
 
 typedef struct {
   task_t* task_stack;
+  hashmap defines;
   struct source_file* sf;
 } preprocessor;
 

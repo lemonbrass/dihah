@@ -1,6 +1,17 @@
+#include <stddef.h>
 #include <stdio.h>
 #include <utils.h>
 #include <da_arena.h>
+
+size_t hash_str(void* str) {
+  size_t hash = 5381;
+  unsigned char c;
+
+  while ((c = *(char*)str++))
+    hash = ((hash << 5) + hash) + c; // hash * 33 + c
+
+  return hash;
+}
 
 char* get_dir(arena* ar, const char* path) {
   const char* last = strrchr(path, '/');

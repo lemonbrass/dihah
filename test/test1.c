@@ -4,8 +4,8 @@
 #include <da_hm.h>
 #include <stdio.h>
 
-uint32_t hash(void* ch) {
-  return (uint32_t)(*((char*)ch));
+size_t hash(void* ch) {
+  return (size_t)(*((char*)ch));
 }
 
 int main() {

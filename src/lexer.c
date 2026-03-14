@@ -1,3 +1,4 @@
+#include <token.h>
 #include <assert.h>
 #include <da_arena.h>
 #include <ctype.h>
@@ -13,8 +14,8 @@ char curr_char(lexer* l) {
 }
 
 lexer new_scratch_lexer() {
-  arena ar = arena_new(1024*16, 0);
-  source_file* sf = arena_alloc(&ar, sizeof(source_file));
+  arena* ar = arena_new(1024*16, 0);
+  source_file* sf = arena_alloc(ar, sizeof(source_file));
   lexer l = {0};
   l.sf = sf;
   return l;
@@ -73,10 +74,7 @@ token lex_id(lexer* l) {
 
   #undef X
 
-  token t;
-  t.content.str = id_cpy;
-  t.type = TT_ID;
-  return t;
+  return new_token_ident(l, id_cpy);
 }
 
 token lex_str(lexer* l) {
@@ -111,23 +109,17 @@ token lex_str(lexer* l) {
   char* str_cpy = arena_alloc(l->sf->ar, strlen(str)+1);
   strcpy(str_cpy, str);
   darr_free(str);
-  token t;
-  t.content.str = str_cpy;
-  t.type = TT_STRING;
-  return t;
+  return new_token_string(l, str_cpy);
 }
 
 token lex_num(lexer* l) {
   char ch = curr_char(l);
-  signed long num = 0;
+  size_t num = 0;
   while (isdigit(ch)) {
     num = num * 10 + (ch - '0');
     ch = VALIDATE_CHAR(advance(l));
   }
-  token t;
-  t.content.num = num;
-  t.type = TT_NUM;
-  return t;
+  return new_token_num(l, num);
 }
 
 token next_tok(lexer* l) {
@@ -181,6 +173,13 @@ token next_tok(lexer* l) {
     return lex_num(l);
   }
 
+  if (ch == '\\') {
+    ch = VALIDATE_CHAR(advance(l));
+    while (isspace(ch) && ch != '\n') ch = VALIDATE_CHAR(advance(l));
+    if (ch != '\n') return ERROR_TOKEN("Invalid character after \\");
+    VALIDATE_CHAR(advance(l));
+    return next_tok(l);
+  }
 
   #define X(tt, v) if (lstrmatch(l, v)) {\
     token t; \
@@ -194,15 +193,11 @@ token next_tok(lexer* l) {
   
   VALIDATE_CHAR(advance(l));
   switch (ch) {
-    #define X(tok_type, c) case c: {token t; t.type = tok_type; return t;}
+    #define X(tok_type, c) case c: return new_token_simple(l, tok_type);
       SEPERATORS(X)
     #undef X
-    case '#': return (token) { .type = TT_PREPROCESS };
-    default: {
-      printf("Invalid character: %c\n", ch);
-      dump_lexer_state(l);
-      exit(1);
-    }
+    case '#': return new_token_simple(l, TT_PREPROCESS);
+    default: return ERROR_TOKEN("INVALID CHARACTER");
   }
 }
 
@@ -235,95 +230,7 @@ void dump_lexer_state(lexer* l) {
   printf("\n");
 }
 
-void print_token_str(token* t) {
-  switch (t->type) {
-    #define X(tt, v) case tt:\
-      printf("%s", v);\
-      break;
-    OPERATORS(X)
-    KEYWORDS(X)
-    #undef X
-    #define X(tt, v) case tt:\
-      printf("%c", v);\
-      break;
-    SEPERATORS(X)
-    #undef X
-    case TT_STRING:
-      printf("\"%s\"", t->content.str);
-      break;
-    case TT_ID:
-      printf("%s", t->content.str);
-      break;
-    case TT_NUM:
-      printf("%ld", t->content.num);
-      break;
-    case TT_EOF: break;
-    case TT_ERROR:
-      printf("ERROR: %s\n", t->content.str);
-      assert(false);
-      break;
-    case TT_PREPROCESS:
-      printf("#");
-      break;
-  }
-}
-
-void print_token(token* t) {
-  switch (t->type) {
-    case TT_PREPROCESS: printf("TT_PREPROCESS(#)"); break;
-    case TT_ID: printf("TT_ID(%s)", t->content.str); break;
-    case TT_NUM: printf("TT_NUM(%ld)", t->content.num); break;
-    case TT_EOF: printf("TT_EOF"); break;
-    case TT_STRING: {
-      printf("TT_STRING(");
-      for (size_t i = 0; i < strlen(t->content.str); i++) {
-        char ch = t->content.str[i];
-        switch (ch) {
-          #define X(c, escapecode) case escapecode: printf("\\%c", c); break;
-            ESCAPES(X)
-            default: printf("%c", ch);
-          #undef X
-        }
-      }
-      printf(")");
-      break;
-    }
-    case TT_ERROR: printf("ERROR: %s\n", t->content.str); assert(false);
-    #define X(tt, v) case tt: printf("%s(%c)", #tt, v); break;
-      SEPERATORS(X)
-    #undef X
-    #define X(tt, v) case tt: printf("%s(%s)", #tt, v); break;
-      KEYWORDS(X)
-      OPERATORS(X)
-    #undef X
-  }
-}
-
-bool tok_cmp(token t1, token t2) {
-  if (t1.type != t2.type) return false;
-  switch (t1.type) {
-    #define X(tt, val) case tt: 
-    OPERATORS(X)
-    SEPERATORS(X)
-    KEYWORDS(X)
-    #undef X
-    case TT_EOF: {
-      return true;
-    }
-
-    case TT_ID:
-    case TT_STRING: {
-      return strcmp(t1.content.str, t2.content.str) == 0;
-    }
-    case TT_NUM: {
-      return t1.content.num == t2.content.num;
-    }
-    default: assert(false);
-  }
-}
-
 bool eat_str(lexer* l, const char* str) {
-  arena ar = arena_new(1024, 0);
   lexer l_new = new_scratch_lexer();
   l_new.sf->source = str;
   token t = next_tok(l);
@@ -332,19 +239,15 @@ bool eat_str(lexer* l, const char* str) {
   while (l_new.length > l_new.id && t_0.type != TT_EOF) {
     if (!tok_cmp(t, t_0)) {
       result = false;
-      goto cleanup;
+      break;
     }
     t = next_tok(l);
     t_0 = next_tok(&l_new);
   }
-
-  cleanup:
-    arena_free(&ar);
-    return result;
+  return result;
 }
 
 bool try_eat_str(lexer* l, const char* str) {
-  arena ar = arena_new(1024, 0);
   lexer l_new = new_scratch_lexer();
   lexer l_mark = *l;
   token t = next_tok(l);
@@ -361,7 +264,6 @@ bool try_eat_str(lexer* l, const char* str) {
   }
 
   cleanup:
-    arena_free(&ar);
     if (!result) *l = l_mark;
     return result;
   

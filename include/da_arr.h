@@ -42,7 +42,7 @@
 
 #define darr_pop(arr) _darr_pop_helper(sizeof(*arr), arr)
 
-#define darr_free(arr) do { if (arr) free((darr_arr*)arr - 1); arr = NULL; } while (0)
+#define darr_free(arr) do { if (arr) { free((darr_arr*)arr - 1); arr = NULL; } } while (0)
 
 typedef struct {
   size_t count;

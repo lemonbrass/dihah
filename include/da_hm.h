@@ -2,13 +2,14 @@
 #define DA_HM_H
 
 #ifndef HM_DEFAULT_CAPACITY
-#define HM_DEFAULT_CAPACITY 128
+#define HM_DEFAULT_CAPACITY 16
 #endif
 
 #ifndef HM_LOAD_FACTOR
 #define HM_LOAD_FACTOR 0.75
 #endif
 
+// TODO: remove linkedlist and use chaining instead......
 #include <linkedlist.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -23,7 +24,7 @@
     (hm) = _hashmap_resize(hm);\
   }\
   typeof(k) key_temp = (k);\
-  uint32_t h = (hm).hash(&key_temp);\
+  size_t h = (hm).hash(&key_temp);\
   linked_list* ll = darr_get((hm).values, ID_FROM_HASH(hm, h));\
   size_t id = 0;\
   hm_val* existing = ll ? ll_get(ll, id) : NULL;\
@@ -35,19 +36,19 @@
     *((typeof(val)*)existing->value) = val;\
   } else {\
     hm_val hv = {0};\
-    hv.value = arena_alloc(&hm.ar, hm.valsize);\
-    hv.key = arena_alloc(&hm.ar, hm.keysize);\
+    hv.value = arena_alloc(hm.ar, hm.valsize);\
+    hv.key = arena_alloc(hm.ar, hm.keysize);\
     *(typeof(k)*)hv.key = key_temp;\
     *((typeof(val)*)hv.value) = val;\
     hv.h = h;\
-    ll_push(ll, &hm.ar, hv);\
+    ll_push(ll, hm.ar, hv);\
     (hm).len++;\
   }\
 })
 
 #define dahm_get(hm, k, valtype) ({\
   typeof(k) key_temp = k;\
-  uint32_t h = hm.hash(&key_temp);\
+  size_t h = hm.hash(&key_temp);\
   linked_list* ll = darr_get(hm.values, ID_FROM_HASH(hm, h));\
   size_t id = 0;\
   hm_val* val = ll ? ll_get(ll, id) : NULL;\
@@ -57,10 +58,10 @@
   }\
   (valtype*)(val ? val->value : NULL);\
 })
-#define dahm_free(hm) ({ arena_free(&(hm).ar); darr_free((hm).values); })
+#define dahm_free(hm) ({ arena_free((hm).ar); darr_free((hm).values); })
 
 typedef struct {
-  uint32_t h;
+  size_t h;
   void* key;
   void* value;
 } hm_val;
@@ -69,20 +70,21 @@ typedef struct {
   size_t keysize;
   size_t valsize;
   linked_list* values;
-  arena ar;
-  uint32_t (*hash)(void*);
+  arena* ar;
+  size_t (*hash)(void*);
   size_t cap, len;
 } hashmap;
 
 
 hashmap _hashmap_resize(hashmap hm);
-uint32_t __nearest_pow2(uint32_t n);
-hashmap _dahm_new_helper(size_t keysize, size_t valsize, uint32_t (*hash)(void*));
+size_t __nearest_pow2(size_t n);
+hashmap _dahm_new_with_cap(size_t keysize, size_t valsize, size_t (*hash)(void*), size_t cap, arena* ar);
+hashmap _dahm_new_helper(size_t keysize, size_t valsize, size_t (*hash)(void*));
 
 
 #ifdef DA_HM_IMPLEMENTATION
 
-hashmap _dahm_new_helper(size_t keysize, size_t valsize, uint32_t (*hash)(void*)){
+hashmap _dahm_new_helper(size_t keysize, size_t valsize, size_t (*hash)(void*)){
   hashmap hm;
   darr_new(hm.values, HM_DEFAULT_CAPACITY, CAPACITY_BASED_BOUNDS);
   hm.keysize = keysize;
@@ -98,7 +100,7 @@ hashmap _dahm_new_helper(size_t keysize, size_t valsize, uint32_t (*hash)(void*)
   return hm;
 }
 
-hashmap _dahm_new_with_cap(size_t keysize, size_t valsize, uint32_t (*hash)(void*), size_t cap, arena ar){
+hashmap _dahm_new_with_cap(size_t keysize, size_t valsize, size_t (*hash)(void*), size_t cap, arena* ar){
   hashmap hm;
   darr_new(hm.values, cap, CAPACITY_BASED_BOUNDS);
   hm.keysize = keysize;
@@ -122,9 +124,9 @@ hashmap _hashmap_resize(hashmap hm) {
     size_t id = 0;
     hm_val* hv = ll_get(ll, id);
     while (hv != NULL) {
-      uint32_t hash = ((hm_val*)hv)->h;
+      size_t hash = ((hm_val*)hv)->h;
       linked_list* ll_ = darr_get(hm_new.values, ID_FROM_HASH(hm_new, hash));
-      ll_push_borrowed(ll_, &hm_new.ar, hv);
+      ll_push_borrowed(ll_, hm_new.ar, hv);
       id++;
       hv = ll_get(ll, id);
     }
@@ -133,9 +135,9 @@ hashmap _hashmap_resize(hashmap hm) {
   return hm_new;
 }
 
-uint32_t __nearest_pow2(uint32_t x) {
+size_t __nearest_pow2(size_t x) {
     if (x <= 1) return 1;
-    return 1u << (32 - __builtin_clz(x - 1));
+    return 1u << (32 - __builtin_clz((unsigned int)x - 1));
 }
 
 #endif
