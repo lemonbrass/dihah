@@ -1,20 +1,17 @@
-#include <da_arr.h>
 #include <uid.h>
+#include <thirdparty/kvec.h>
 
 
 
-void* set_sym(uid_t uid, source_file* sf, void* data) {
-  void** container = darr_get(sf->symbols, uid);
-  if (container) *container = data;
-  else return NULL;
-  return data;
+void set_sym(uid_t uid, source_file* sf, void* data) {
+  kv_A(sf->symbols, uid) = data;
 }
 
 uid_t new_uid(source_file* sf) {
-  darr_push(sf->symbols, NULL);
+  kv_push(void*, sf->symbols, NULL);
   return sf->_g_next_uid++;
 }
 void* get_sym(uid_t uid, source_file* sf) {
-  return darr_get(sf->symbols, uid);
+  return kv_A(sf->symbols, uid);
 }
 

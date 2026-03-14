@@ -1,7 +1,7 @@
+#include "thirdparty/kvec.h"
 #include "utils.h"
 #include <da_arena.h>
 #include <source_file.h>
-#include <da_arr.h>
 #include <lexer.h>
 #include <preprocessor.h>
 #include <string.h>
@@ -9,8 +9,8 @@
 source_file* new_sf(arena* ar, char* filename) {
   source_file* sf = arena_alloc(ar, sizeof(source_file));
   memset(sf, 0, sizeof(*sf));
-  darr_new(sf->symbols, 8*sizeof(void*), CAPACITY_BASED_BOUNDS);
-  darr_push(sf->search_paths, get_dir(ar, filename));
+  kv_init(sf->search_paths);
+  kv_push(char*, sf->search_paths, get_dir(ar, filename));
   sf->_g_next_uid = 1;
   sf->ar = ar;
   sf->filename = arena_alloc(ar, strlen(filename) + 1);
@@ -23,7 +23,7 @@ source_file* new_sf(arena* ar, char* filename) {
 
 void free_sf(source_file* sf) {
   pp_free(&sf->pp);
-  darr_free(sf->symbols);
-  darr_free(sf->search_paths);
-  darr_free(sf->sys_search_paths);
+  kv_destroy(sf->symbols);
+  kv_destroy(sf->search_paths);
+  kv_destroy(sf->sys_search_paths);
 }

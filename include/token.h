@@ -1,6 +1,7 @@
 #ifndef TOKEN_H
 #define TOKEN_H
 
+#include <da_string.h>
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -109,7 +110,7 @@ struct lexer;
 #define ERROR_TOKEN(msg) ({\
   token t;\
   t.type = TT_ERROR;\
-  t.content.str = msg;\
+  t.content.str = sv_new(msg, strlen(msg));\
   t;\
 })
 
@@ -131,12 +132,11 @@ typedef enum {
 typedef struct {
   size_t line;
   size_t ch;
-  size_t start;
-  size_t end;
+  size_t id;
 } pos_t;
 
 typedef union {
-  const char* str;
+  string_view str;
   size_t num;
   char op;
 } tok_data;
@@ -149,11 +149,11 @@ typedef struct {
 
 void print_token(token* t);
 void print_token_str(token* t);
-char* tok_to_str(token t);
+string_view tok_to_str(token t);
 bool tok_cmp(token t1, token t2);
 
-token new_token_string(struct lexer* l, const char* str);
-token new_token_ident(struct lexer* l, const char* str);
+token new_token_string(struct lexer* l, string_view str);
+token new_token_ident(struct lexer* l, string_view str);
 // TODO: 123F and 123UL etc..... and different number types
 token new_token_num(struct lexer* l, size_t num);
 token new_token_simple(struct lexer* l, tok_type tt);

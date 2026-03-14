@@ -1,3 +1,4 @@
+#include "da_string.h"
 #include <token.h>
 #include <lexer.h>
 #include <assert.h>
@@ -19,17 +20,21 @@ void print_token_str(token* t) {
     SEPERATORS(X)
     #undef X
     case TT_STRING:
-      printf("\"%s\"", t->content.str);
+      printf("\"");
+      s_print(t->content.str);
+      printf("\"");
       break;
     case TT_ID:
-      printf("%s", t->content.str);
+      s_print(t->content.str);
       break;
     case TT_NUM:
       printf("%ld", t->content.num);
       break;
     case TT_EOF: break;
     case TT_ERROR:
-      printf("ERROR: %s\n", t->content.str);
+      printf("ERROR: ");
+      s_print(t->content.str);
+      printf("\n");
       assert(false);
       break;
     case TT_PREPROCESS:
@@ -41,13 +46,13 @@ void print_token_str(token* t) {
 void print_token(token* t) {
   switch (t->type) {
     case TT_PREPROCESS: printf("TT_PREPROCESS(#)"); break;
-    case TT_ID: printf("TT_ID(%s)", t->content.str); break;
+    case TT_ID: printf("TT_ID(%.*s)", (int)s_len(t->content.str), s_str(t->content.str)); break;
     case TT_NUM: printf("TT_NUM(%ld)", t->content.num); break;
     case TT_EOF: printf("TT_EOF"); break;
     case TT_STRING: {
-      printf("TT_STRING(");
-      for (size_t i = 0; i < strlen(t->content.str); i++) {
-        char ch = t->content.str[i];
+      printf("TT_STRING(\"");
+      for (size_t i = 0; i < s_len(t->content.str); i++) {
+        char ch = s_str(t->content.str)[i];
         switch (ch) {
           #define X(c, escapecode) case escapecode: printf("\\%c", c); break;
             ESCAPES(X)
@@ -55,10 +60,10 @@ void print_token(token* t) {
           #undef X
         }
       }
-      printf(")");
+      printf("\")");
       break;
     }
-    case TT_ERROR: printf("ERROR: %s\n", t->content.str); assert(false);
+    case TT_ERROR: printf("ERROR: %.*s\n", (int)s_len(t->content.str), s_str(t->content.str)); assert(false);
     #define X(tt, v) case tt: printf("%s(%c)", #tt, v); break;
       SEPERATORS(X)
     #undef X
@@ -83,7 +88,7 @@ bool tok_cmp(token t1, token t2) {
 
     case TT_ID:
     case TT_STRING: {
-      return strcmp(t1.content.str, t2.content.str) == 0;
+      return s_cmp(t1.content.str, t2.content.str) == 0;
     }
     case TT_NUM: {
       return t1.content.num == t2.content.num;
@@ -92,14 +97,14 @@ bool tok_cmp(token t1, token t2) {
   }
 }
 
-token new_token_string(struct lexer* l, const char* str) {
+token new_token_string(struct lexer* l, string_view str) {
   token t;
   t.content.str = str;
   t.pos = l->pos;
   t.type = TT_STRING;
   return t;
 }
-token new_token_ident(struct lexer* l, const char* str) {
+token new_token_ident(struct lexer* l, string_view str) {
   token t;
   t.pos = l->pos;
   t.content.str = str;

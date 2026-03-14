@@ -1,13 +1,11 @@
 #ifndef PREPROCESSOR_H
 #define PREPROCESSOR_H
 
-#include <da_hm.h>
+#include "da_string.h"
 #include <da_arena.h>
 #include <lexer.h>
 
 struct source_file;
-extern hashmap defines; // GLOBAL for all parsers.....
-
 
 #define DIRECTIVES(X)\
   X(PP_INCLUDE, include)\
@@ -69,7 +67,7 @@ typedef struct {
 
 // TODO: header file search places
 typedef struct {
-  char* filename;
+  string_view filename;
   bool angled;
   struct source_file* sf;
 } include_task;
@@ -84,8 +82,7 @@ typedef struct {
 
 
 typedef struct {
-  task_t* task_stack;
-  hashmap defines;
+  kvec_t(task_t) task_stack;
   struct source_file* sf;
 } preprocessor;
 

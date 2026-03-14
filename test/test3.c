@@ -1,7 +1,6 @@
-#define DA_ARR_IMPLEMENTATION
-#define DA_HM_IMPLEMENTATION
 #define DA_ARENA_IMPLEMENTATION
 
+#include <da_string.h>
 #include <da_arena.h>
 #include <source_file.h>
 #include <uid.h>

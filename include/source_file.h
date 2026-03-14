@@ -1,6 +1,7 @@
 #ifndef SOURCE_FILE_H
 #define SOURCE_FILE_H
 
+#include "thirdparty/kvec.h"
 #include <utils.h>
 #include <lexer.h>
 #include <preprocessor.h>
@@ -8,14 +9,14 @@
 typedef struct source_file source_file;
 
 struct source_file{
-  char** search_paths;
-  char** sys_search_paths;
+  kvec_t(char*) search_paths;
+  kvec_t(char*) sys_search_paths;
   preprocessor pp;
   lexer l;
   char* filename;
   const char* source;
   uid_t _g_next_uid;
-  void** symbols; // uid_t -> symbols
+  kvec_t(void*) symbols; // uid_t -> symbols
   arena* ar;
 };
 

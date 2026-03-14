@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <da_arena.h>
 #include <token.h>
-#include <da_arr.h>
 #include <stdio.h>
 
 

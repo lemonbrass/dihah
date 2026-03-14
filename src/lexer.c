@@ -1,9 +1,9 @@
 #include <token.h>
 #include <assert.h>
+#include <da_string.h>
 #include <da_arena.h>
 #include <ctype.h>
 #include <lexer.h>
-#include <da_arr.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,21 +52,18 @@ lexer new_lexer(source_file* sf) {
 
 token lex_id(lexer* l) {
   char ch = curr_char(l);
-  char* id = NULL;
+  size_t currpos = l->id;
+  size_t size = 0;
   while (isalnum(ch) || ch == '_') {
-    darr_push(id, ch);
+    size++;
     ch = VALIDATE_CHAR(advance(l));
   }
-  darr_push(id, '\0');
-  char* id_cpy = arena_alloc(l->sf->ar, darr_len(id));
-  memcpy(id_cpy, id, darr_len(id));
-  darr_free(id);
-  
+  string_view id = sv_new(l->sf->source + currpos, size);
   #define X(tt, k) \
-  if (strcmp(id_cpy, k) == 0) {\
+  if (memcmp(s_str(id), k, size) == 0) {\
     token t;\
     t.type = tt; \
-    t.content.str = id_cpy; \
+    t.content.str = id; \
     return t;\
   }
 
@@ -74,25 +71,24 @@ token lex_id(lexer* l) {
 
   #undef X
 
-  return new_token_ident(l, id_cpy);
+  return new_token_ident(l, id);
 }
 
 token lex_str(lexer* l) {
-  char* str = NULL;
   char ch = VALIDATE_CHAR(advance(l));
+  da_string ds = ds_new(l->sf->ar);
   while (true) {
     if (ch == '\\') {
-      switch (peek(l)) {
+      switch (ch) {
         
         #define X(code, val)\
-           case code: darr_push(str, val); VALIDATE_CHAR(advance(l)); break;
+           case code: ds_push_char(&ds,  val) ; break;
           ESCAPES(X)
         #undef X
 
         default:
           printf("INVALID STRING ESCAPE\n");
           dump_lexer_state(l);
-          darr_free(str);
           exit(1);
       }
       ch = VALIDATE_CHAR(advance(l));
@@ -102,14 +98,12 @@ token lex_str(lexer* l) {
       VALIDATE_CHAR(advance(l));
       break;
     }
-    darr_push(str, ch);
+    ds_push_char(&ds, ch);
     ch = VALIDATE_CHAR(advance(l));
   }
-  darr_push(str, '\0');
-  char* str_cpy = arena_alloc(l->sf->ar, strlen(str)+1);
-  strcpy(str_cpy, str);
-  darr_free(str);
-  return new_token_string(l, str_cpy);
+  ds_push_char(&ds, '\0'); // "" => c auto adds a '\0'
+  string_view sv = ds_build(&ds);
+  return new_token_string(l, sv);
 }
 
 token lex_num(lexer* l) {
@@ -184,7 +178,7 @@ token next_tok(lexer* l) {
   #define X(tt, v) if (lstrmatch(l, v)) {\
     token t; \
     t.type = tt; \
-    t.content.str = v; \
+    t.content.str = sv_new(v, strlen(v)); \
     VALIDATE_CHAR(advance(l));\
     return t;\
   }

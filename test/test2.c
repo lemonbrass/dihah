@@ -1,6 +1,5 @@
-#define DA_ARR_IMPLEMENTATION
-#define DA_HM_IMPLEMENTATION
 #define DA_ARENA_IMPLEMENTATION
+#include <da_string.h>
 #include "preprocessor.h"
 #include <da_arena.h>
 #include <lexer.h>
@@ -11,8 +10,8 @@ int main() {
   source_file* sf = new_sf(ar, "test/src1.dihc");
 
   for (token t = pp_next_tok(&sf->pp); t.type != TT_EOF; t = pp_next_tok(&sf->pp)) {
-    print_token_str(&t);
-    printf(" ");
+    print_token(&t);
+    printf("\n");
     if (t.type == TT_ERROR) break;
   }
   printf("\n");

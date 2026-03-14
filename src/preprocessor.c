@@ -1,8 +1,8 @@
+#include "da_string.h"
+#include "thirdparty/kvec.h"
 #include "token.h"
 #include <da_arena.h>
-#include <da_hm.h>
 #include <utils.h>
-#include <da_arr.h>
 #include <lexer.h>
 #include <preprocessor.h>
 #include <source_file.h>
@@ -25,8 +25,7 @@ PP_FUNC token parse_ifdef(PP* pp) { (void)pp; return ERROR_TOKEN("UNREACHABLE");
 PP pp_new(source_file* sf){
   PP pp;
   pp.sf = sf;
-  pp.task_stack = NULL;
-  pp.defines = dahm_new(char*, define_data, &hash_str);
+  kv_init(pp.task_stack);
   return pp;
 }
 
@@ -34,13 +33,13 @@ PP_FUNC include_task get_include_data(lexer* l) {
   include_task inc = {0};
   char ch;
   ch = VALIDATE_CHAR(advance(l));
-  char* buf = NULL;
+  da_string buf = ds_new(l->sf->ar);
   
   if (ch == '<') {
     inc.angled = true;
     ch = VALIDATE_CHAR(advance(l));
     while (ch != '>' && ch != '\0') {
-      darr_push(buf, ch);
+      ds_push_char(&buf, ch);
       ch = VALIDATE_CHAR(advance(l));
     }
     VALIDATE_CHAR(advance(l));  
@@ -49,7 +48,7 @@ PP_FUNC include_task get_include_data(lexer* l) {
     inc.angled = false;
     ch = VALIDATE_CHAR(advance(l));
     while (ch != '"' && ch != '\0') {
-      darr_push(buf, ch);
+      ds_push_char(&buf, ch);
       ch = VALIDATE_CHAR(advance(l));
     }
     VALIDATE_CHAR(advance(l));
@@ -58,29 +57,27 @@ PP_FUNC include_task get_include_data(lexer* l) {
     assert(false && "Invalid token after #include");
   }
 
-  darr_push(buf, '\0');
-  char* str = arena_alloc(l->sf->ar, strlen(buf) + 1);
-  strcpy(str, buf);
-  darr_free(buf);
-
-  inc.filename = str;
+  ds_push_char(&buf, '\0');
+  inc.filename = ds_build(&buf);
   return inc;
 }
 
 char* include_read_file(PP* pp, include_task* inc) {
-  char** paths = inc->angled ? pp->sf->sys_search_paths : pp->sf->search_paths;
+  kvec_t(char*)* paths;
+  if (inc->angled) paths = (void*)&pp->sf->sys_search_paths;
+  else paths = (void*)&pp->sf->search_paths;
   
-  for (size_t i = 0; i < darr_len(paths); i++) {
+  for (size_t i = 0; i < kv_size(*paths); i++) {
     arena_mark_t m = arena_mark(ARENA);
-    char* path = paths[i];
+    char* path = kv_A(*paths, i);
     size_t path_len = strlen(path);
-    size_t filename_len = strlen(inc->filename);
+    size_t filename_len = s_len(inc->filename);
     size_t len = path_len + filename_len + 2;
     char* buf = arena_alloc(ARENA, len);
   
     memcpy(buf, path, path_len);
     buf[path_len] = '/';
-    memcpy(buf+path_len+1, inc->filename, filename_len);
+    memcpy(buf+path_len+1, s_str(inc->filename), filename_len);
     buf[len-1] = '\0';
 
     FILE* f = fopen(buf, "r");
@@ -100,9 +97,9 @@ PP_FUNC token parse_define(PP* pp) {
   token name = match_consume(LEXER, TT_ID);
 }
 
-PP_FUNC token parse_if(PP* pp) { (void) pp;  return (token) { .type = TT_ERROR, .content.str = "UNIMPLEMENTED"}; }
-PP_FUNC token parse_error(PP* pp) { (void) pp; return (token) { .type = TT_ERROR, .content.str = "UNIMPLEMENTED"};  }
-PP_FUNC token parse_warning(PP* pp) { (void) pp; return (token) { .type = TT_ERROR, .content.str = "UNIMPLEMENTED"};  }
+PP_FUNC token parse_if(PP* pp) { (void) pp;  return ERROR_TOKEN("UNIMPLEMENTED"); }
+PP_FUNC token parse_error(PP* pp) { (void) pp; return ERROR_TOKEN("UNIMPLEMENTED");  }
+PP_FUNC token parse_warning(PP* pp) { (void) pp; return ERROR_TOKEN("UNIMPLEMENTED");  }
 
 PP_FUNC token parse_include(PP* pp) {
   include_task inc = get_include_data(LEXER);
@@ -112,12 +109,12 @@ PP_FUNC token parse_include(PP* pp) {
   task_t t;
   t.type = PP_INCLUDE;
   t.val.inc = inc;
-  darr_push(pp->task_stack, t);
+  kv_push(task_t, pp->task_stack, t);
   return pp_next_tok(&t.val.inc.sf->pp);
 }
 
 void pop_task(PP* pp) {
-  task_t* t = darr_pop(pp->task_stack);
+  task_t* t = &kv_pop(pp->task_stack);
 
   switch (t->type) {
     case PP_INCLUDE: free_sf(t->val.inc.sf);
@@ -126,9 +123,9 @@ void pop_task(PP* pp) {
 }
 
 token pp_next_tok(PP* pp) {
-  size_t len = darr_len(pp->task_stack);
+  size_t len = kv_size(pp->task_stack);
   if (len > 0) {
-    task_t t = pp->task_stack[len-1];
+    task_t t = kv_A(pp->task_stack, len-1);
     token tok = pp_next_tok(&t.val.inc.sf->pp);
     if (tok.type == TT_EOF) {
       pop_task(pp);
@@ -141,7 +138,7 @@ token pp_next_tok(PP* pp) {
     t = next_tok(LEXER);
     switch (t.type) {
       case TT_ID: {
-          #define X(tt, v) if(strcmp(t.content.str, #v) == 0) return parse_##v(pp);
+          #define X(tt, v) if(strcmp(s_str(t.content.str), #v)) return parse_##v(pp);
           DIRECTIVES(X)
           #undef X
         return ERROR_TOKEN("Invalid preprocessor directive");
@@ -155,6 +152,5 @@ token pp_next_tok(PP* pp) {
 }
 
 void pp_free(PP *pp) {
-  dahm_free(pp->defines);
-  darr_free(pp->task_stack);
+  kv_destroy(pp->task_stack);
 }
