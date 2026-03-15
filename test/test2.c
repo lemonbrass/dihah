@@ -10,8 +10,8 @@ int main() {
   source_file* sf = new_sf(ar, "test/src1.dihc");
 
   for (token t = pp_next_tok(&sf->pp); t.type != TT_EOF; t = pp_next_tok(&sf->pp)) {
-    print_token(&t);
-    printf("\n");
+    print_token_str(&t);
+    printf(" ");
     if (t.type == TT_ERROR) break;
   }
   printf("\n");

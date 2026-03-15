@@ -100,33 +100,33 @@ bool tok_cmp(token t1, token t2) {
 token new_token_string(struct lexer* l, string_view str) {
   token t;
   t.content.str = str;
-  t.pos = l->pos;
+  t.pos = l->tok_start;
   t.type = TT_STRING;
   return t;
 }
 token new_token_ident(struct lexer* l, string_view str) {
   token t;
-  t.pos = l->pos;
+  t.pos = l->tok_start;
   t.content.str = str;
   t.type = TT_ID;
   return t;
 }
 token new_token_num(struct lexer* l, size_t num) {
   token t;
-  t.pos = l->pos;
+  t.pos = l->tok_start;
   t.content.num = num;
   t.type = TT_NUM;
   return t;
 }
 token new_token_simple(struct lexer* l, tok_type tt) {
   token t;
-  t.pos = l->pos;
+  t.pos = l->tok_start;
   t.type = tt;
   return t;
 }
 token new_token_complex(struct lexer* l, tok_type tt, tok_data data) {
   token t;
-  t.pos = l->pos;
+  t.pos = l->tok_start;
   t.content = data;
   t.type = tt;
   return t;

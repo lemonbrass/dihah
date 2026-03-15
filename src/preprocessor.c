@@ -87,34 +87,6 @@ char* include_read_file(PP* pp, include_task* inc) {
   return NULL;
 }
 
-PP_FUNC token parse_define(PP* pp) {
-  // non function ones :-
-  // #define ______ _______till \n.
-  token name = match_consume(LEXER, TT_ID);
-  if (try_eat_tok(LEXER, TOKEN_SYM(TT_OPAREN))) {
-    // TODO: Function like macros
-    return ERROR_TOKEN("UNIMPLEMENTED");
-  } else {
-    define_data dd;
-    kv_init(dd.args);
-    kv_init(dd.val);
-    size_t currline = name.pos.line;
-    token tok = next_tok(LEXER);
-    lexer l_mark = *LEXER;
-    do {
-      kv_push(token, dd.val, tok);
-      l_mark = *LEXER;
-      tok = next_tok(LEXER);
-    } while (currline == tok.pos.line);
-    *LEXER = l_mark;
-    int res;
-    khint_t k = kh_put(macromap, pp->defines, (name.content.str), &res);
-    kh_val(pp->defines, k) = dd;
-  }
-
-  return pp_next_tok(pp);
-}
-
 PP_FUNC token parse_include(PP* pp) {
   include_task inc = get_include_data(LEXER);
   char* source = include_read_file(pp, &inc);
@@ -150,12 +122,42 @@ token get_include_token(PP* pp, task_t* t) {
   }
 }
 
+PP_FUNC token parse_define(PP* pp) {
+  // non function ones :-
+  // #define ______ _______till \n.
+  token name = match_consume(LEXER, TT_ID);
+  if (try_eat_tok(LEXER, TOKEN_SYM(TT_OPAREN))) {
+    // TODO: Function like macros
+    return ERROR_TOKEN("UNIMPLEMENTED");
+  } else {
+    define_data dd;
+    dd.disabled = false;
+    kv_init(dd.args);
+    kv_init(dd.val);
+    size_t currline = name.pos.line;
+    token tok = next_tok(LEXER);
+    lexer l_mark = *LEXER;
+    while (currline == tok.pos.line) {
+      kv_push(token, dd.val, tok);
+      l_mark = *LEXER;
+      tok = next_tok(LEXER);
+    }
+    *LEXER = l_mark;
+    int res;
+    khint_t k = kh_put(macromap, pp->defines, (name.content.str), &res);
+    kh_val(pp->defines, k) = dd;
+  }
+
+  return pp_next_tok(pp);
+}
+
 void create_macro_task(PP* pp, define_data* data) {
   task_t macro_task;
   macro_task.type = PP_DEFINE;
   kv_init(macro_task.val.macro.buffer);
   macro_task.val.macro.data = data;
   macro_task.val.macro.pos = 0;
+  data->disabled = true;
   if (kv_size(data->args)==0) {
     // macro.buffer is READ-ONLY here....
     macro_task.val.macro.buffer = data->val;
@@ -167,19 +169,34 @@ void create_macro_task(PP* pp, define_data* data) {
   kv_push(task_t, pp->task_stack, macro_task);
 }
 
+token scan_macro(PP* pp, token t) {
+  if (t.type != TT_ID) return t;
+  khint_t k = kh_get(macromap, pp->defines, t.content.str);
+  if (k != kh_end(pp->defines)) {
+    define_data* data = &kh_val(pp->defines, k);
+    if (!data->disabled) {
+      create_macro_task(pp, data);
+      return pp_next_tok(pp);
+    }
+  }
+  return t;
+}
+
 token get_define_token(PP* pp, task_t* t) {
   if (kv_size(t->val.macro.data->args) == 0) {
     if (t->val.macro.pos >= kv_size(t->val.macro.buffer)) {
+      t->val.macro.data->disabled = false;
       pop_task(pp);
       return pp_next_tok(pp);
     }
-    return kv_A(t->val.macro.buffer, t->val.macro.pos++);
+    return scan_macro(pp, kv_A(t->val.macro.buffer, t->val.macro.pos++));
   }
   else {
     // TODO: Function like macros
     return ERROR_TOKEN("UNIMPLEMENTED");
   }
 }
+
 
 token pp_next_tok(PP* pp) {
   size_t len = kv_size(pp->task_stack);
@@ -205,15 +222,7 @@ token pp_next_tok(PP* pp) {
       }
     }
   }
-  else if (t.type == TT_ID) { // maybe macro
-    khint_t k = kh_get(macromap, pp->defines, t.content.str);
-    if (k != kh_end(pp->defines)) {
-      define_data* data = &kh_val(pp->defines, k);
-      create_macro_task(pp, data);
-      return pp_next_tok(pp);
-    }
-  }
-  return t;
+  return scan_macro(pp, t);
 }
 
 void pp_free(PP *pp) {

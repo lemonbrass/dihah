@@ -53,6 +53,7 @@ typedef kvec_t(token) token_arr;
 typedef struct {
   token_arr args;
   token_arr val;
+  bool disabled;
 } define_data;
 
 // used when actually macros are accessed

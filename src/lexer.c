@@ -48,6 +48,8 @@ lexer new_lexer(source_file* sf) {
   l.length = strlen(sf->source) + 1;
   l.pos.ch = 1;
   l.pos.line = 1;
+  l.tok_start.ch = 1;
+  l.tok_start.line = 1;
   l.sf = sf;
 
   return l;
@@ -63,7 +65,7 @@ token lex_id(lexer* l) {
   }
   string_view id = sv_new(l->sf->source + currpos, size);
   #define X(tt, k) \
-  if (memcmp(s_str(id), k, size) == 0) {\
+  if (cs_cmp(id, k)) {\
     token t;\
     t.type = tt; \
     t.content.str = id; \
@@ -124,6 +126,8 @@ token next_tok(lexer* l) {
   while (isspace((unsigned char)ch)) {
     ch = advance(l);
   }
+
+  l->tok_start = l->pos;
 
   if (ch == '\0') {
     token t;

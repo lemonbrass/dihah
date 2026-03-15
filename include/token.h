@@ -134,7 +134,6 @@ typedef enum {
 typedef struct {
   size_t line;
   size_t ch;
-  size_t id;
 } pos_t;
 
 typedef union {

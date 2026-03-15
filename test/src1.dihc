@@ -1,8 +1,14 @@
 #include "src1.dihh"
 #define MAGIC_NUMBER 18
 #define A B
-#define B 10
-A
+#define B C
+#define C 10 + 20 - 30
+A A A
+#define D D
+D
+#define E F
+#define F E
+E
 int y = -5 - -2;
 int x = y + 1;
 

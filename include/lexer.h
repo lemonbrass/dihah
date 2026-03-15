@@ -28,6 +28,7 @@ struct lexer{
   size_t length;
   size_t id;
   pos_t pos;
+  pos_t tok_start;
 };
 
 bool lstrmatch(lexer* l, const char* str);
