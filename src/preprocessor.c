@@ -1,6 +1,8 @@
 #include "da_string.h"
+#include "thirdparty/khash.h"
 #include "thirdparty/kvec.h"
 #include "token.h"
+#include <assert.h>
 #include <da_arena.h>
 #include <utils.h>
 #include <lexer.h>
@@ -13,45 +15,40 @@
 #define ARENA pp->sf->ar
 #define PP_FUNC static inline
 
-// these wont be needed.. because parse_if(PP*) handles these
-PP_FUNC token parse_undef(PP* pp) { (void)pp; return ERROR_TOKEN("UNREACHABLE"); }
-PP_FUNC token parse_elif(PP* pp) { (void)pp; return ERROR_TOKEN("UNREACHABLE"); }
-PP_FUNC token parse_else(PP* pp) { (void)pp; return ERROR_TOKEN("UNREACHABLE"); }
-PP_FUNC token parse_ifndef(PP* pp) { (void)pp; return ERROR_TOKEN("UNREACHABLE"); }
-PP_FUNC token parse_endif(PP* pp) { (void)pp; return ERROR_TOKEN("UNREACHABLE"); }
-PP_FUNC token parse_ifdef(PP* pp) { (void)pp; return ERROR_TOKEN("UNREACHABLE"); }
-
 
 PP pp_new(source_file* sf){
   PP pp;
   pp.sf = sf;
   kv_init(pp.task_stack);
+  pp.defines = kh_init(macromap);
   return pp;
 }
 
 PP_FUNC include_task get_include_data(lexer* l) {
   include_task inc = {0};
   char ch;
-  ch = VALIDATE_CHAR(advance(l));
+  ch = advance(l);
   da_string buf = ds_new(l->sf->ar);
   
   if (ch == '<') {
     inc.angled = true;
-    ch = VALIDATE_CHAR(advance(l));
+    ch = advance(l);
     while (ch != '>' && ch != '\0') {
       ds_push_char(&buf, ch);
-      ch = VALIDATE_CHAR(advance(l));
+      ch = advance(l);
     }
-    VALIDATE_CHAR(advance(l));  
+    EOF_CHECK(ch);
+    advance(l);  
   }
   else if (ch == '"') {
     inc.angled = false;
-    ch = VALIDATE_CHAR(advance(l));
+    ch = advance(l);
     while (ch != '"' && ch != '\0') {
       ds_push_char(&buf, ch);
-      ch = VALIDATE_CHAR(advance(l));
+      ch = advance(l);
     }
-    VALIDATE_CHAR(advance(l));
+    EOF_CHECK(ch);
+    advance(l);
   }
   else {
     assert(false && "Invalid token after #include");
@@ -90,16 +87,33 @@ char* include_read_file(PP* pp, include_task* inc) {
   return NULL;
 }
 
-
 PP_FUNC token parse_define(PP* pp) {
   // non function ones :-
   // #define ______ _______till \n.
   token name = match_consume(LEXER, TT_ID);
-}
+  if (try_eat_tok(LEXER, TOKEN_SYM(TT_OPAREN))) {
+    // TODO: Function like macros
+    return ERROR_TOKEN("UNIMPLEMENTED");
+  } else {
+    define_data dd;
+    kv_init(dd.args);
+    kv_init(dd.val);
+    size_t currline = name.pos.line;
+    token tok = next_tok(LEXER);
+    lexer l_mark = *LEXER;
+    do {
+      kv_push(token, dd.val, tok);
+      l_mark = *LEXER;
+      tok = next_tok(LEXER);
+    } while (currline == tok.pos.line);
+    *LEXER = l_mark;
+    int res;
+    khint_t k = kh_put(macromap, pp->defines, (name.content.str), &res);
+    kh_val(pp->defines, k) = dd;
+  }
 
-PP_FUNC token parse_if(PP* pp) { (void) pp;  return ERROR_TOKEN("UNIMPLEMENTED"); }
-PP_FUNC token parse_error(PP* pp) { (void) pp; return ERROR_TOKEN("UNIMPLEMENTED");  }
-PP_FUNC token parse_warning(PP* pp) { (void) pp; return ERROR_TOKEN("UNIMPLEMENTED");  }
+  return pp_next_tok(pp);
+}
 
 PP_FUNC token parse_include(PP* pp) {
   include_task inc = get_include_data(LEXER);
@@ -117,35 +131,86 @@ void pop_task(PP* pp) {
   task_t* t = &kv_pop(pp->task_stack);
 
   switch (t->type) {
-    case PP_INCLUDE: free_sf(t->val.inc.sf);
-    default: return;
+    case PP_INCLUDE:
+      free_sf(t->val.inc.sf);
+      break;
+    default:
+      break;
+  }
+}
+
+token get_include_token(PP* pp, task_t* t) {
+  token tok = pp_next_tok(&t->val.inc.sf->pp);
+  if (tok.type == TT_EOF) {
+    pop_task(pp);
+    return pp_next_tok(pp);
+  }
+  else {
+    return tok;
+  }
+}
+
+void create_macro_task(PP* pp, define_data* data) {
+  task_t macro_task;
+  macro_task.type = PP_DEFINE;
+  kv_init(macro_task.val.macro.buffer);
+  macro_task.val.macro.data = data;
+  macro_task.val.macro.pos = 0;
+  if (kv_size(data->args)==0) {
+    // macro.buffer is READ-ONLY here....
+    macro_task.val.macro.buffer = data->val;
+  }
+  else {
+    // TODO: Function like macros
+    assert(false);
+  }
+  kv_push(task_t, pp->task_stack, macro_task);
+}
+
+token get_define_token(PP* pp, task_t* t) {
+  if (kv_size(t->val.macro.data->args) == 0) {
+    if (t->val.macro.pos >= kv_size(t->val.macro.buffer)) {
+      pop_task(pp);
+      return pp_next_tok(pp);
+    }
+    return kv_A(t->val.macro.buffer, t->val.macro.pos++);
+  }
+  else {
+    // TODO: Function like macros
+    return ERROR_TOKEN("UNIMPLEMENTED");
   }
 }
 
 token pp_next_tok(PP* pp) {
   size_t len = kv_size(pp->task_stack);
   if (len > 0) {
-    task_t t = kv_A(pp->task_stack, len-1);
-    token tok = pp_next_tok(&t.val.inc.sf->pp);
-    if (tok.type == TT_EOF) {
-      pop_task(pp);
+    task_t* t = &kv_A(pp->task_stack, len-1);
+    switch (t->type) {
+      case PP_INCLUDE: return get_include_token(pp, t);
+      case PP_DEFINE: return get_define_token(pp, t);
+      default: return ERROR_TOKEN("UNIMPLEMENTED");
     }
-    else
-      return tok;
   }
   token t = next_tok(LEXER);
   if (t.type == TT_PREPROCESS) {
     t = next_tok(LEXER);
     switch (t.type) {
       case TT_ID: {
-          #define X(tt, v) if(strcmp(s_str(t.content.str), #v)) return parse_##v(pp);
-          DIRECTIVES(X)
-          #undef X
+        if (cs_cmp(t.content.str, "include")) return parse_include(pp);
+        if (cs_cmp(t.content.str, "define")) return parse_define(pp);
         return ERROR_TOKEN("Invalid preprocessor directive");
-        }
+      }
       default: {
         return ERROR_TOKEN("Invalid preprocessor directive");
       }
+    }
+  }
+  else if (t.type == TT_ID) { // maybe macro
+    khint_t k = kh_get(macromap, pp->defines, t.content.str);
+    if (k != kh_end(pp->defines)) {
+      define_data* data = &kh_val(pp->defines, k);
+      create_macro_task(pp, data);
+      return pp_next_tok(pp);
     }
   }
   return t;
@@ -153,4 +218,10 @@ token pp_next_tok(PP* pp) {
 
 void pp_free(PP *pp) {
   kv_destroy(pp->task_stack);
+  kh_destroy(macromap, pp->defines);
 }
+
+// PP_FUNC token parse_if(PP* pp) { (void) pp;  return ERROR_TOKEN("UNIMPLEMENTED"); }
+// PP_FUNC token parse_error(PP* pp) { (void) pp; return ERROR_TOKEN("UNIMPLEMENTED");  }
+// PP_FUNC token parse_warning(PP* pp) { (void) pp; return ERROR_TOKEN("UNIMPLEMENTED");  }
+

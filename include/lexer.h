@@ -7,12 +7,7 @@
 #include <stdio.h>
 
 
-
-// validate a character 
-#define VALIDATE_CHAR(ch) ({\
-  int tmp = (ch);\
-  (char)((tmp != -1) ? tmp : (printf("VALIDATE_CHAR error: ch = -1 & line = %d\n", __LINE__), exit(1), '\0'));\
-})
+#define EOF_CHECK(ch) do {assert(ch!='\0' && "Unexpected EOF");} while(0)
 
 // TODO: symantic analysis: ID CANT COME AFTER NUM... etc
 typedef enum {
@@ -38,17 +33,15 @@ struct lexer{
 bool lstrmatch(lexer* l, const char* str);
 void dump_lexer_state(lexer* l);
 char curr_char(lexer* l);
-int advance(lexer* l);
+char advance(lexer* l);
 
-lexer new_scratch_lexer();
+lexer new_scratch_lexer(const char* str);
 void free_scratch_lexer(lexer* l);
   
 lexer new_lexer(struct source_file* sf);
 token next_tok(lexer* l);
 int peek(lexer* l);
-// compare next token with a str which is transformed to a token....
-bool eat_str(lexer* l, const char* str);
-bool try_eat_str(lexer* l, const char* str);
+
 bool try_eat_tok(lexer* l, const token t);
 bool eat_tok(lexer* l, const token t);
 token match_consume(lexer* l, const tok_type t);

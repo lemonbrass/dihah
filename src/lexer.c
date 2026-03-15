@@ -13,11 +13,14 @@ char curr_char(lexer* l) {
   return l->sf->source[l->id];
 }
 
-lexer new_scratch_lexer() {
+lexer new_scratch_lexer(const char* str) {
   arena* ar = arena_new(1024*16, 0);
   source_file* sf = arena_alloc(ar, sizeof(source_file));
   lexer l = {0};
   l.sf = sf;
+  l.sf->ar = ar;
+  l.sf->filename = "scratch";
+  l.sf->source = str;
   return l;
 }
 
@@ -25,8 +28,8 @@ void free_scratch_lexer(lexer* l) {
   arena_free(l->sf->ar);
 }
 
-int advance(lexer* l) {
-  if (l->id + 1 >= l->length) return -1;
+char advance(lexer* l) {
+  if (l->id + 1 >= l->length) return '\0';
   l->id++;
   char next = curr_char(l);
   if (next == '\n') {
@@ -56,7 +59,7 @@ token lex_id(lexer* l) {
   size_t size = 0;
   while (isalnum(ch) || ch == '_') {
     size++;
-    ch = VALIDATE_CHAR(advance(l));
+    ch = advance(l);
   }
   string_view id = sv_new(l->sf->source + currpos, size);
   #define X(tt, k) \
@@ -75,7 +78,7 @@ token lex_id(lexer* l) {
 }
 
 token lex_str(lexer* l) {
-  char ch = VALIDATE_CHAR(advance(l));
+  char ch = advance(l);
   da_string ds = ds_new(l->sf->ar);
   while (true) {
     if (ch == '\\') {
@@ -91,15 +94,15 @@ token lex_str(lexer* l) {
           dump_lexer_state(l);
           exit(1);
       }
-      ch = VALIDATE_CHAR(advance(l));
+      ch = advance(l);
       continue;
     }
     if (ch == '\"') {
-      VALIDATE_CHAR(advance(l));
+      advance(l);
       break;
     }
     ds_push_char(&ds, ch);
-    ch = VALIDATE_CHAR(advance(l));
+    ch = advance(l);
   }
   ds_push_char(&ds, '\0'); // "" => c auto adds a '\0'
   string_view sv = ds_build(&ds);
@@ -111,7 +114,7 @@ token lex_num(lexer* l) {
   size_t num = 0;
   while (isdigit(ch)) {
     num = num * 10 + (ch - '0');
-    ch = VALIDATE_CHAR(advance(l));
+    ch = advance(l);
   }
   return new_token_num(l, num);
 }
@@ -119,7 +122,7 @@ token lex_num(lexer* l) {
 token next_tok(lexer* l) {
   char ch = curr_char(l);
   while (isspace((unsigned char)ch)) {
-    ch = VALIDATE_CHAR(advance(l));
+    ch = advance(l);
   }
 
   if (ch == '\0') {
@@ -128,29 +131,29 @@ token next_tok(lexer* l) {
     return t;
   }
 
-  // DONOT VALIDATE_CHAR(PEEK) HERE, ITS USELSS + IT WILL ERROR OUT IF ITS EOF
+  // DONOT PEEK) HERE ITS USELSS + IT WILL ERROR OUT IF ITS EOF
   if (ch == '/' && peek(l) == '/') {
-    VALIDATE_CHAR(advance(l)); //skip first /
-    VALIDATE_CHAR(advance(l)); //skip second /
+    advance(l); //skip first /
+    advance(l); //skip second /
     while (ch != '\0' && ch != '\n') {
-      ch = VALIDATE_CHAR(advance(l));
+      ch = advance(l);
     }
     return next_tok(l);
   }
 
   if (ch == '/' && peek(l) == '*') {
-    VALIDATE_CHAR(advance(l)); //skip /
-    VALIDATE_CHAR(advance(l)); //skip *
-    while (ch != '\0' && (ch != '*' || VALIDATE_CHAR(peek(l)) != '/')) {
-      ch = VALIDATE_CHAR(advance(l));
+    advance(l); //skip /
+    advance(l); //skip *
+    while (ch != '\0' && (ch != '*' || peek(l) != '/')) {
+      ch = advance(l);
     }
     if (ch == '\0') {
       printf("Unterminated /**/ comment :D\n");
       dump_lexer_state(l);
       exit(1);
     }
-    VALIDATE_CHAR(advance(l)); //skip *
-    VALIDATE_CHAR(advance(l)); //skip /
+    advance(l); //skip *
+    advance(l); //skip /
     return next_tok(l);
   }
 
@@ -168,10 +171,10 @@ token next_tok(lexer* l) {
   }
 
   if (ch == '\\') {
-    ch = VALIDATE_CHAR(advance(l));
-    while (isspace(ch) && ch != '\n') ch = VALIDATE_CHAR(advance(l));
+    ch = advance(l);
+    while (isspace(ch) && ch != '\n') ch = advance(l);
     if (ch != '\n') return ERROR_TOKEN("Invalid character after \\");
-    VALIDATE_CHAR(advance(l));
+    advance(l);
     return next_tok(l);
   }
 
@@ -179,18 +182,17 @@ token next_tok(lexer* l) {
     token t; \
     t.type = tt; \
     t.content.str = sv_new(v, strlen(v)); \
-    VALIDATE_CHAR(advance(l));\
+    advance(l);\
     return t;\
   }
   OPERATORS(X)
   #undef X
   
-  VALIDATE_CHAR(advance(l));
   switch (ch) {
-    #define X(tok_type, c) case c: return new_token_simple(l, tok_type);
+    #define X(tok_type, c) case c: advance(l); return new_token_simple(l, tok_type);
       SEPERATORS(X)
     #undef X
-    case '#': return new_token_simple(l, TT_PREPROCESS);
+    case '#': advance(l); return new_token_simple(l, TT_PREPROCESS);
     default: return ERROR_TOKEN("INVALID CHARACTER");
   }
 }
@@ -222,45 +224,6 @@ void dump_lexer_state(lexer* l) {
     ch = l->sf->source[id];
   }
   printf("\n");
-}
-
-bool eat_str(lexer* l, const char* str) {
-  lexer l_new = new_scratch_lexer();
-  l_new.sf->source = str;
-  token t = next_tok(l);
-  token t_0 = next_tok(&l_new);
-  bool result = true;
-  while (l_new.length > l_new.id && t_0.type != TT_EOF) {
-    if (!tok_cmp(t, t_0)) {
-      result = false;
-      break;
-    }
-    t = next_tok(l);
-    t_0 = next_tok(&l_new);
-  }
-  return result;
-}
-
-bool try_eat_str(lexer* l, const char* str) {
-  lexer l_new = new_scratch_lexer();
-  lexer l_mark = *l;
-  token t = next_tok(l);
-  token t_0 = next_tok(&l_new);
-  bool result = true;
-  l_new.sf->source = str;
-  while (l_new.length > l_new.id && t_0.type != TT_EOF) {
-    if (!tok_cmp(t, t_0)) {
-      result = false;
-      goto cleanup;
-    }
-    t = next_tok(l);
-    t_0 = next_tok(&l_new);
-  }
-
-  cleanup:
-    if (!result) *l = l_mark;
-    return result;
-  
 }
 
 bool eat_tok(lexer* l, const token t) {

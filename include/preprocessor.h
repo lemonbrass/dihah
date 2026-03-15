@@ -4,6 +4,7 @@
 #include "da_string.h"
 #include <da_arena.h>
 #include <lexer.h>
+#include <thirdparty/khash.h>
 
 struct source_file;
 
@@ -47,16 +48,17 @@ typedef enum {
   #undef X
 } PP_DIRECTIVE;
 
+typedef kvec_t(token) token_arr;
 // used inside hashmap called define_table....
 typedef struct {
-  token* args;
-  token* val;
+  token_arr args;
+  token_arr val;
 } define_data;
 
 // used when actually macros are accessed
 typedef struct {
   define_data* data;
-  token* buffer;
+  token_arr buffer;
   size_t pos;
 } macro_task;
 
@@ -77,12 +79,17 @@ typedef struct {
   union {
     include_task inc;
     cond_task cond;
+    macro_task macro;
   } val;
 } task_t;
 
+khint_t sv_hash(string_view sv);
+
+KHASH_INIT(macromap, string_view, define_data, 1, sv_hash, s_cmp);
 
 typedef struct {
   kvec_t(task_t) task_stack;
+  khash_t(macromap)* defines;
   struct source_file* sf;
 } preprocessor;
 

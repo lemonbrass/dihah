@@ -7,6 +7,8 @@
 
 struct lexer;
 
+#define TOKEN_SYM(type) new_token_simple(LEXER, type)
+
 #define OPERATORS(X) \
   X(TT_LSHIFT_EQ, "<<=") \
   X(TT_RSHIFT_EQ, ">>=") \

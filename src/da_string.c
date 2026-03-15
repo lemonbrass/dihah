@@ -1,7 +1,16 @@
+#include "thirdparty/khash.h"
 #include <da_string.h>
 
 
 
+khint_t sv_hash(string_view sv) {
+  uint32_t h = 2166136261u;
+  while (sv.len--) {
+      h ^= (uint8_t)*sv.str++;
+      h *= 16777619u;
+  }
+  return h;
+}
 
 string_view sv_new(const char* str, size_t len) {
   return (string_view){.str = str, .len = len};

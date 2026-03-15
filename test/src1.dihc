@@ -1,4 +1,8 @@
 #include "src1.dihh"
+#define MAGIC_NUMBER 18
+#define A B
+#define B 10
+A
 int y = -5 - -2;
 int x = y + 1;
 
@@ -6,5 +10,6 @@ int x = y + 1;
 void a(int a, int b) {
   // equate and print "equal haahahahahah \n \r \t"
   if (a == b) printf("equal haahahahahaha\n \r \t");
+  printf("Waiting for her to turn: %d", MAGIC_NUMBER);
 }
 
